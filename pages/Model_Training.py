@@ -22,7 +22,7 @@ except ImportError:
 st.title("Page 2: Model Training")
 
 # ========== SECURITY CHECK: Session State ==========
-if "data" not in st.session_state:
+if "data" not in st.session_state or st.session_state["data"] is None:
     st.warning("⚠️ Please upload data first from Page 1.")
     st.stop()
 
