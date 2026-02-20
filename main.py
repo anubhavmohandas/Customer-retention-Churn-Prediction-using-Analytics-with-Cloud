@@ -150,12 +150,12 @@ print(cv_scores)
 random forest gives the highest accuracy compared to other models with default parameters
 """
 rfc = RandomForestClassifier(random_state=42)
-model.fit(X_train_smote,y_train_smote)
+rfc.fit(X_train_smote, y_train_smote)
 print(y_test.value_counts())
 """
 Model evaluation
 """
-y_test_pred = model.predict(X_test)
+y_test_pred = rfc.predict(X_test)
 print("Accuracy score: \n ", accuracy_score(y_test,y_test_pred))
 print("Confusion matrix: \n",  confusion_matrix(y_test,y_test_pred))
 print("Classification:\n", classification_report(y_test,y_test_pred))

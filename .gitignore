@@ -1,0 +1,6 @@
+*.png
+*.pkl
+saved_models/
+dataset/
+__pycache__/
+.streamlit/
