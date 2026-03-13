@@ -8,7 +8,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ========== SECURITY: Session State Initialization ==========
+# ========== SESSION STATE INITIALIZATION ==========
 if "data" not in st.session_state:
     st.session_state["data"] = None
 if "trained_model" not in st.session_state:
@@ -27,7 +27,7 @@ st.markdown("""
 #### 📌 How to Use:
 1. **Page 1 - Data Upload**: Upload your customer dataset (CSV format)
 2. **Page 2 - Model Training**: Select algorithm and train the model
-3. View performance metrics and predictions
+3. **Page 3 - Quick Predict**: Predict churn for individual customers
 
 #### 🔒 Security Features:
 - File size limit: 10MB
@@ -71,13 +71,13 @@ st.markdown("""
 with st.sidebar:
     st.write("### 📊 Navigation")
     st.info("Use the sidebar to navigate between pages.")
-    
+
     st.write("### ℹ️ About")
     st.write("""
     This system predicts customer churn using:
-    - Logistic Regression
+    - Decision Tree
     - Random Forest
     - XGBoost
-    
+
     Dataset: Kaggle Telco Customer Churn
     """)
