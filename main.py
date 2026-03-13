@@ -102,7 +102,7 @@ def generate_visualizations(df, output_dir="."):
 
 def preprocess_and_encode(df):
     """Encode target and categorical features, return encoders."""
-    df["Churn"] = df["Churn"].replace({"Yes": 1, "No": 0})
+    df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0})
     print(df["Churn"].value_counts())
 
     object_columns = df.select_dtypes(include=["object", "string"]).columns
