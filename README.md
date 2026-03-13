@@ -228,10 +228,6 @@ Actual Churn   99     274
 ## Future Scope
 
 - [ ] AWS EC2 Deployment
-- [ ] Deep Learning (LSTM)
-- [ ] Real-time Streaming (Kafka)
-- [ ] SHAP Explainability
-- [ ] Mobile App (React Native)
 
 -----
 
