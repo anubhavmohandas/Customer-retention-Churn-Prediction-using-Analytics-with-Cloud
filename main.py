@@ -169,21 +169,28 @@ def train_and_evaluate(df):
     return rfc, X.columns.tolist()
 
 
+MODEL_DIR = "saved_models"
+MODEL_PATH = os.path.join(MODEL_DIR, "churn_model.pkl")
+ENCODERS_PATH = os.path.join(MODEL_DIR, "encoders.pkl")
+
+
 def save_artifacts(model, feature_names, encoders):
-    """Save model and encoders using joblib."""
+    """Save model and encoders using joblib to saved_models/."""
+    os.makedirs(MODEL_DIR, exist_ok=True)
+
     model_data = {
         "model": model,
         "feature_names": feature_names,
     }
-    joblib.dump(model_data, "customer_churn_model.pkl")
-    joblib.dump(encoders, "encoders.pkl")
-    print("\nModel saved to: customer_churn_model.pkl")
-    print("Encoders saved to: encoders.pkl")
+    joblib.dump(model_data, MODEL_PATH)
+    joblib.dump(encoders, ENCODERS_PATH)
+    print(f"\nModel saved to: {MODEL_PATH}")
+    print(f"Encoders saved to: {ENCODERS_PATH}")
 
 
 def verify_saved_model():
     """Load and verify saved artifacts."""
-    model_data = joblib.load("customer_churn_model.pkl")
+    model_data = joblib.load(MODEL_PATH)
     loaded_model = model_data["model"]
     feature_names = model_data["feature_names"]
     print(f"\nVerification - Model type: {type(loaded_model).__name__}")

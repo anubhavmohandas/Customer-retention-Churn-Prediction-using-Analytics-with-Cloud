@@ -1,58 +1,40 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import pickle
 import os
-
-
-def load_pkl(path):
-    """Load pkl file with joblib, fall back to pickle for legacy files."""
-    try:
-        return joblib.load(path)
-    except Exception:
-        with open(path, "rb") as f:
-            return pickle.load(f)
 
 st.title("Page 3: Quick Predict")
 st.write("### Predict Customer Churn Using Pre-Trained Model")
 
 # ========== LOAD PRE-TRAINED MODEL ==========
-# Check both possible model locations (main.py saves to root, UI saves to saved_models/)
-MODEL_PATHS = [
-    ("customer_churn_model.pkl", "encoders.pkl"),           # main.py output
-    ("saved_models/churn_model.pkl", "saved_models/encoders.pkl"),  # UI output
-]
+MODEL_DIR = "saved_models"
+MODEL_PATH = os.path.join(MODEL_DIR, "churn_model.pkl")
+ENCODERS_PATH = os.path.join(MODEL_DIR, "encoders.pkl")
 
 model_loaded = False
 model = None
 feature_names = None
 encoders = None
 
-for model_path, encoders_path in MODEL_PATHS:
-    if os.path.exists(model_path) and os.path.exists(encoders_path):
-        try:
-            model_data = load_pkl(model_path)
-            model = model_data["model"]
-            # Handle both old key (features_names) and new key (feature_names)
-            feature_names = model_data.get("feature_names") or model_data.get("features_names")
-            if feature_names is None:
-                raise KeyError("No feature names found in model file")
+if os.path.exists(MODEL_PATH) and os.path.exists(ENCODERS_PATH):
+    try:
+        model_data = joblib.load(MODEL_PATH)
+        model = model_data["model"]
+        feature_names = model_data["feature_names"]
 
-            encoders = load_pkl(encoders_path)
+        encoders = joblib.load(ENCODERS_PATH)
 
-            st.success(f"✅ Pre-trained model loaded from `{model_path}`")
-            model_loaded = True
-            break
+        st.success("✅ Pre-trained model loaded successfully!")
+        model_loaded = True
 
-        except Exception as e:
-            st.error(f"❌ Error loading model from `{model_path}`: {str(e)}")
-
-if not model_loaded:
+    except Exception as e:
+        st.error(f"❌ Error loading model: {str(e)}")
+else:
     st.warning("⚠️ Pre-trained model not found!")
     st.info("""
     **To use this feature:**
     1. Run `python main.py` first to train and save the model
-    2. This will generate `customer_churn_model.pkl` and `encoders.pkl`
+    2. This will generate model files in `saved_models/`
     3. Then come back to this page
 
     **Or** use Page 1 & 2 to upload your own data and train a new model.
@@ -197,7 +179,7 @@ if model_loaded:
     st.write("---")
 
     # ========== INPUT VALIDATION ==========
-    min_expected_total = monthly_charges * tenure * 0.5  # Allow some tolerance
+    min_expected_total = monthly_charges * tenure * 0.5
     if tenure > 0 and total_charges < min_expected_total and total_charges > 0:
         st.warning(
             f"⚠️ Total charges (${total_charges:.0f}) seem low for "
