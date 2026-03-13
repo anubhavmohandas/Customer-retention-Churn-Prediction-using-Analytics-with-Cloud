@@ -4,3 +4,6 @@ saved_models/
 dataset/
 __pycache__/
 .streamlit/
+*.pyc
+.env
+dataset.zip
