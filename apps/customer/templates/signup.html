@@ -82,6 +82,7 @@
                 </div>
 
                 <form id="signupForm" class="space-y-5">
+                    {% csrf_token %}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">First Name</label>
@@ -114,7 +115,7 @@
                 </form>
 
                 <div class="text-center mt-8 text-sm text-gray-500 dark:text-zinc-400">
-                    Already have an account? <a href="http://127.0.0.1:8000/accounts/login" class="text-black dark:text-white font-bold underline underline-offset-4">Sign in</a>
+                    Already have an account? <a href="/accounts/login/" class="text-black dark:text-white font-bold underline underline-offset-4">Sign in</a>
                 </div>
             </div>
         </div>
@@ -144,10 +145,15 @@
             btn.classList.add('btn-loading');
             btn.disabled = true;
 
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
             try {
-                const response = await fetch("http://127.0.0.1:8000/api/signup/", {
+                const response = await fetch("/api/signup/", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken,
+                    },
                     body: JSON.stringify({
                         first_name: fn,
                         last_name: ln,
@@ -163,7 +169,7 @@
 
                     // REDIRECT AFTER 2 SECONDS
                     setTimeout(() => {
-                        window.location.href = "http://127.0.0.1:8000/accounts/login";
+                        window.location.href = "/accounts/login/";
                     }, 2000);
                 } else {
                     const data = await response.json();

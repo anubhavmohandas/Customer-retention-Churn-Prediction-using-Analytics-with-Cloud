@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 import random
@@ -8,10 +9,13 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.db.models import Q, Avg, Sum
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,7 +32,6 @@ def signup_page(request):
     return render(request, 'signup.html')
 
 
-@csrf_exempt
 def signup(request):
     if request.method == "POST":
         try:
@@ -36,8 +39,16 @@ def signup(request):
             email = data.get("work_email")
             password = data.get("password")
 
+            if not email or not password:
+                return JsonResponse({"error": "Email and password are required"}, status=400)
+
             if Customer.objects.filter(email=email).exists():
                 return JsonResponse({"error": "Email already registered"}, status=400)
+
+            try:
+                validate_password(password)
+            except ValidationError as ve:
+                return JsonResponse({"error": list(ve.messages)}, status=400)
 
             user = Customer.objects.create_user(
                 username=email,
@@ -49,8 +60,9 @@ def signup(request):
                 role=data.get("role", "")
             )
             return JsonResponse({"message": "Signup successful", "user_id": user.id}, status=201)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+        except Exception:
+            logger.exception("Signup failed")
+            return JsonResponse({"error": "Something went wrong. Please try again."}, status=500)
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 
@@ -58,7 +70,6 @@ def login_page(request):
     return render(request, 'login.html')
 
 
-@csrf_exempt
 def login_view(request):
     if request.method == "POST":
         try:
@@ -75,8 +86,9 @@ def login_view(request):
                     "full_name": f"{user.first_name} {user.last_name}"
                 }, status=200)
             return JsonResponse({"error": "Invalid email or password"}, status=400)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+        except Exception:
+            logger.exception("Login failed")
+            return JsonResponse({"error": "Something went wrong. Please try again."}, status=500)
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 
