@@ -3,13 +3,62 @@
    Clean light-mode only. Plus Jakarta Sans. Black/white minimal.
    ============================================================ */
 
-/* ── FORCE LIGHT MODE — kills django-admin-interface dark toggle ── */
-:root {
-  color-scheme: light only !important;
+/* ── FORCE LIGHT MODE — override ALL django-admin-interface CSS variables ── */
+:root,
+:root[data-color-scheme="dark"],
+:root[data-color-scheme="auto"],
+html[data-color-scheme="dark"],
+html[data-color-scheme="auto"] {
+  color-scheme: light !important;
+  --primary:                  #111827 !important;
+  --secondary:                #374151 !important;
+  --accent:                   #6b7280 !important;
+  --primary-fg:               #ffffff !important;
+  --body-fg:                  #111827 !important;
+  --body-bg:                  #f9fafb !important;
+  --body-loud-color:          #000000 !important;
+  --body-quiet-color:         #6b7280 !important;
+  --header-color:             #ffffff !important;
+  --header-branding-color:    #ffffff !important;
+  --header-bg:                #0a0a0a !important;
+  --header-link-color:        #f9fafb !important;
+  --breadcrumbs-fg:           #374151 !important;
+  --breadcrumbs-link-fg:      #111827 !important;
+  --breadcrumbs-bg:           #ffffff !important;
+  --link-fg:                  #111827 !important;
+  --link-hover-color:         #000000 !important;
+  --link-selected-fg:         #000000 !important;
+  --hairline-color:           #e5e7eb !important;
+  --border-color:             #e5e7eb !important;
+  --module-bg:                #ffffff !important;
+  --darkened-bg:              #f3f4f6 !important;
+  --selected-bg:              #f3f4f6 !important;
+  --selected-row:             #f3f4f6 !important;
+  --button-fg:                #ffffff !important;
+  --button-bg:                #111827 !important;
+  --button-hover-bg:          #000000 !important;
+  --default-button-bg:        #000000 !important;
+  --default-button-hover-bg:  #000000 !important;
+  --object-tools-fg:          #ffffff !important;
+  --object-tools-bg:          #111827 !important;
+  --object-tools-hover-bg:    #000000 !important;
+  --font-family:              'Plus Jakarta Sans', sans-serif !important;
 }
+
 html, body {
   background-color: #f9fafb !important;
   color: #111827 !important;
+}
+
+/* Hide the moon/sun dark-mode toggle button */
+#header button,
+#header [data-color-scheme-toggle],
+.color-scheme-toggle,
+button.theme-toggle,
+a.theme-toggle,
+#header > div > button,
+#header li > button {
+  display: none !important;
 }
 
 /* ── FONTS ── */
