@@ -162,6 +162,10 @@ STORAGES = {
     },
 }
 
+# Don't explode if a CSS/JS file references a non-existent source map or asset
+# (common with third-party admin themes like django-jazzmin).
+WHITENOISE_MANIFEST_STRICT = False
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ---------------------------------------------------------------------------
