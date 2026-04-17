@@ -1,4 +1,5 @@
 from django.urls import path
+from django.contrib.auth.views import LogoutView
 from apps.customer.views import (
     signup,
     signup_page,
@@ -17,6 +18,7 @@ urlpatterns = [
     path('signup/', signup_page, name='signup_page'),
     path('api/signup/', signup, name='signup_api'),
     path('accounts/login/', login_page, name='login'),  # Standard Django login path
+    path('accounts/logout/', LogoutView.as_view(next_page='/accounts/login/'), name='logout'),
     path('api/login/', login_view, name='login_api'),
 
     # --- Dashboard & Core Pages ---
