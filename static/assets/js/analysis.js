@@ -1,5 +1,5 @@
 /**
- * RetainIQ - Risk Analysis Engine
+ * Retain.Ai - Risk Analysis Engine
  * Handles Dynamic Chart.js Visualizations from Django Data
  */
 

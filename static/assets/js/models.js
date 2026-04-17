@@ -1,5 +1,5 @@
 /**
- * RetainIQ - Model Comparison Engine
+ * Retain.Ai - Model Comparison Engine
  * Handles dynamic UI updates for Model Registry
  */
 

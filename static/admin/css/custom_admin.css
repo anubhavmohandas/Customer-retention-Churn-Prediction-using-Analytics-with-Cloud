@@ -1,10 +1,19 @@
 /* ============================================================
-   RetainIQ Admin — Custom Theme
-   Matches main app: Plus Jakarta Sans, black/white minimal
+   Retain.Ai Admin — Custom Theme
+   Clean light-mode only. Plus Jakarta Sans. Black/white minimal.
    ============================================================ */
 
+/* ── FORCE LIGHT MODE — kills django-admin-interface dark toggle ── */
+:root {
+  color-scheme: light only !important;
+}
+html, body {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+}
+
 /* ── FONTS ── */
-*, body, input, select, textarea, button {
+*, body, input, select, textarea, button, th, td, label, a {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
   letter-spacing: -0.01em;
 }
@@ -14,37 +23,50 @@
   background: #0a0a0a !important;
   color: #f9fafb !important;
   border-bottom: none !important;
-  padding: 12px 24px !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) !important;
+  padding: 0 28px !important;
+  height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-shadow: none !important;
 }
 
 #header a:link,
 #header a:visited {
   color: #f9fafb !important;
+  text-decoration: none !important;
+}
+
+#header #branding h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
 }
 
 #header #branding h1,
 #header #branding h1 a:link,
 #header #branding h1 a:visited {
   color: #ffffff !important;
-  font-size: 1.15rem !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.03em !important;
+  font-size: 1.1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
 }
 
 #header #user-tools {
   font-size: 0.72rem !important;
   font-weight: 500 !important;
-  letter-spacing: 0.02em !important;
-  color: rgba(249,250,251,0.6) !important;
+  letter-spacing: 0.01em !important;
+  color: rgba(249,250,251,0.55) !important;
 }
 
-#header #user-tools a {
-  color: rgba(249,250,251,0.85) !important;
+#header #user-tools a,
+#header #user-tools a:link,
+#header #user-tools a:visited {
+  color: rgba(249,250,251,0.8) !important;
   border-bottom: none !important;
   text-decoration: none !important;
-  padding: 4px 8px !important;
+  padding: 5px 10px !important;
   border-radius: 6px !important;
+  font-weight: 500 !important;
   transition: background 0.15s, color 0.15s !important;
 }
 
@@ -53,18 +75,32 @@
   background: rgba(255,255,255,0.1) !important;
 }
 
-/* ── BREADCRUMBS ── */
-div.breadcrumbs {
-  background: #f3f4f6 !important;
-  color: #6b7280 !important;
-  font-size: 0.78rem !important;
-  font-weight: 500 !important;
-  padding: 10px 24px !important;
-  border-bottom: 1px solid #e5e7eb !important;
+/* Hide dark mode toggle from admin-interface */
+#header .theme-toggle,
+.theme-toggle,
+[data-theme-toggle],
+#header button[title*="theme"],
+#header button[title*="Theme"],
+#header button[aria-label*="theme"] {
+  display: none !important;
 }
 
-div.breadcrumbs a {
-  color: #111827 !important;
+/* ── BREADCRUMBS ── */
+div.breadcrumbs {
+  background: #ffffff !important;
+  color: #9ca3af !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 10px 28px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  letter-spacing: 0 !important;
+}
+
+div.breadcrumbs a,
+div.breadcrumbs a:link,
+div.breadcrumbs a:visited {
+  color: #374151 !important;
+  font-weight: 600 !important;
 }
 
 div.breadcrumbs a:hover {
@@ -72,29 +108,64 @@ div.breadcrumbs a:hover {
   text-decoration: underline !important;
 }
 
-/* ── CONTENT AREA ── */
-#content-main,
-#content {
-  background: #f9fafb !important;
-}
-
+/* ── CONTENT WRAPPER ── */
 #container {
   background: #f9fafb !important;
 }
 
-/* ── SIDEBAR / NAV ── */
-#nav-sidebar {
-  background: #ffffff !important;
-  border-right: 1px solid #e5e7eb !important;
-}
-
-#nav-sidebar .current-app .app-title,
-.toggle-nav-sidebar {
-  background: #ffffff !important;
+#content-main,
+#content {
+  background: #f9fafb !important;
+  padding: 24px 28px !important;
   color: #111827 !important;
 }
 
-/* ── MODULE HEADERS (section titles like "CUSTOMER", "AUTH") ── */
+#content h1 {
+  color: #111827 !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 20px !important;
+}
+
+/* ── NAV SIDEBAR ── */
+#nav-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid #f0f0f0 !important;
+  padding-top: 8px !important;
+}
+
+#nav-sidebar .current-app .app-title {
+  background: #f9fafb !important;
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
+#nav-sidebar .module {
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  margin-bottom: 0 !important;
+}
+
+.toggle-nav-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid #f0f0f0 !important;
+  color: #9ca3af !important;
+}
+
+/* ── MODULE CARDS ── */
+.module {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+  background: #ffffff !important;
+  margin-bottom: 18px !important;
+}
+
+/* ── MODULE HEADERS ── */
 .module caption,
 .module > h2,
 .module > table > caption,
@@ -102,75 +173,109 @@ div.breadcrumbs a:hover {
 #changelist-filter h3 {
   background: #111827 !important;
   color: #f9fafb !important;
-  font-size: 0.7rem !important;
+  font-size: 0.65rem !important;
   font-weight: 700 !important;
-  letter-spacing: 0.08em !important;
+  letter-spacing: 0.1em !important;
   text-transform: uppercase !important;
-  padding: 10px 14px !important;
+  padding: 11px 16px !important;
   border-radius: 0 !important;
 }
 
-/* ── APP GROUPS IN INDEX ── */
-#content-main .app-customer a.section:link,
-#content-main .app-customer a.section:visited,
-.app-auth a.section:link,
-.app-auth a.section:visited {
-  color: #111827 !important;
-}
-
-/* ── MODULE BODY ── */
-.module {
-  border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+/* ── MODULE TABLE ROWS ── */
+.module table tbody tr td,
+.module table tbody tr th {
+  color: #374151 !important;
   background: #ffffff !important;
-  margin-bottom: 16px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  padding: 11px 16px !important;
+  font-size: 0.85rem !important;
 }
 
-/* ── TABLE ── */
+.module table tbody tr:last-child td,
+.module table tbody tr:last-child th {
+  border-bottom: none !important;
+}
+
+.module table tbody tr:hover td,
+.module table tbody tr:hover th {
+  background: #f9fafb !important;
+}
+
+.module table tbody tr td a,
+.module table tbody tr th a,
+.module table tbody tr td a:link,
+.module table tbody tr td a:visited {
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+
+.module table tbody tr td a:hover {
+  color: #000 !important;
+}
+
+/* ── RESULT TABLE ── */
+#result_list {
+  border: none !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+}
+
 #result_list thead th,
 #result_list thead th a,
 #result_list thead th a:link,
 #result_list thead th a:visited {
   background: #f3f4f6 !important;
-  color: #374151 !important;
-  font-size: 0.72rem !important;
+  color: #6b7280 !important;
+  font-size: 0.68rem !important;
   font-weight: 700 !important;
-  letter-spacing: 0.06em !important;
+  letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
   border-bottom: 1px solid #e5e7eb !important;
+  padding: 11px 14px !important;
 }
 
-#result_list thead th.sorted a {
-  color: #000 !important;
+#result_list thead th.sorted a,
+#result_list thead th.ascending a,
+#result_list thead th.descending a {
+  color: #111827 !important;
 }
 
-#result_list thead th.ascending a::after,
-#result_list thead th.descending a::after {
-  color: #000 !important;
+#result_list tbody td,
+#result_list tbody th {
+  color: #374151 !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  font-size: 0.85rem !important;
+  padding: 11px 14px !important;
+}
+
+#result_list tbody tr:nth-child(even) td,
+#result_list tbody tr:nth-child(even) th {
+  background: #fafafa !important;
 }
 
 #result_list tbody tr:hover td,
 #result_list tbody tr:hover th {
-  background: #f9fafb !important;
+  background: #f3f4f6 !important;
 }
 
 #result_list tbody tr.selected td,
 #result_list tbody tr.selected th {
-  background: #f3f4f6 !important;
+  background: #eff6ff !important;
 }
 
-/* Alternate row striping */
-#result_list tbody tr:nth-child(even) td {
-  background: #fafafa !important;
+#result_list tbody td a,
+#result_list tbody td a:link,
+#result_list tbody td a:visited {
+  color: #111827 !important;
+  font-weight: 600 !important;
 }
 
-/* ── LINKS ── */
+/* ── GLOBAL LINKS ── */
 a:link, a:visited {
   color: #111827 !important;
 }
-
 a:hover {
   color: #000 !important;
 }
@@ -188,9 +293,10 @@ a.button {
   font-weight: 600 !important;
   font-size: 0.8rem !important;
   letter-spacing: -0.01em !important;
-  padding: 8px 16px !important;
+  padding: 9px 18px !important;
   cursor: pointer !important;
-  transition: background 0.15s !important;
+  transition: background 0.15s, transform 0.1s !important;
+  box-shadow: none !important;
 }
 
 .button:hover,
@@ -199,72 +305,127 @@ input[type=submit]:hover,
 a.button:hover {
   background: #000 !important;
   color: #fff !important;
+  transform: translateY(-1px) !important;
 }
 
 .button.default,
-input[type=submit].default,
-.submit-row input.default {
+input[type=submit].default {
   background: #000 !important;
 }
 
-/* Delete button */
-.deletelink,
-a.deletelink {
-  background: #fee2e2 !important;
+/* Add/Change links in index */
+.addlink,
+a.addlink {
+  background: #111827 !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+}
+
+.addlink:hover,
+a.addlink:hover {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+.changelink,
+a.changelink {
+  color: #6b7280 !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+}
+
+.changelink:hover,
+a.changelink:hover {
+  color: #111827 !important;
+}
+
+/* Delete */
+.deletelink, a.deletelink {
+  background: #fef2f2 !important;
   color: #dc2626 !important;
   border: 1px solid #fecaca !important;
   border-radius: 8px !important;
-  padding: 8px 16px !important;
+  padding: 9px 18px !important;
   font-weight: 600 !important;
   font-size: 0.8rem !important;
 }
 
-.deletelink:hover,
-a.deletelink:hover {
-  background: #fecaca !important;
+.deletelink:hover, a.deletelink:hover {
+  background: #fee2e2 !important;
   color: #b91c1c !important;
 }
 
-/* ── SEARCH BAR ── */
+/* ── SEARCH / TOOLBAR ── */
+#toolbar {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  padding: 12px 28px !important;
+}
+
 #toolbar form input[type="text"],
 #searchbar {
   border: 1px solid #e5e7eb !important;
   border-radius: 8px !important;
-  padding: 7px 12px !important;
+  padding: 8px 14px !important;
   font-size: 0.85rem !important;
-  background: #ffffff !important;
+  background: #f9fafb !important;
   color: #111827 !important;
   outline: none !important;
-  transition: border-color 0.15s !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+  min-width: 260px !important;
 }
 
 #toolbar form input[type="text"]:focus,
 #searchbar:focus {
   border-color: #111827 !important;
   box-shadow: 0 0 0 3px rgba(0,0,0,0.06) !important;
+  background: #fff !important;
 }
 
 #toolbar form input[type="submit"] {
   background: #111827 !important;
+  color: #fff !important;
   border-radius: 8px !important;
   border: none !important;
-  padding: 7px 14px !important;
+  padding: 8px 16px !important;
   font-size: 0.8rem !important;
-}
-
-/* ── FILTER SIDEBAR ── */
-#changelist-filter {
-  background: #ffffff !important;
-  border-left: 1px solid #e5e7eb !important;
-  border-radius: 0 12px 12px 0 !important;
-}
-
-#changelist-filter li.selected a {
-  color: #000 !important;
   font-weight: 600 !important;
 }
 
-#changelist-filter a:hover {
+/* ── FILTER PANEL ── */
+#changelist-filter {
+  background: #ffffff !important;
+  border-left: 1px solid #f0f0f0 !important;
+  padding: 0 !important;
+}
+
+#changelist-filter ul {
+  padding: 0 16px 12px !important;
+}
+
+#changelist-filter li {
+  font-size: 0.82rem !important;
+  padding: 3px 0 !important;
+  color: #374151 !important;
+}
+
+#changelist-filter li a,
+#changelist-filter li a:link,
+#changelist-filter li a:visited {
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+}
+
+#changelist-filter li.selected a,
+#changelist-filter li.selected a:link {
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
+#changelist-filter li a:hover {
   color: #000 !important;
 }
 
@@ -272,19 +433,21 @@ a.deletelink:hover {
 .paginator {
   font-size: 0.78rem !important;
   color: #6b7280 !important;
-  border-top: 1px solid #e5e7eb !important;
-  padding: 12px 16px !important;
+  border-top: 1px solid #f3f4f6 !important;
+  padding: 14px 20px !important;
   background: #ffffff !important;
 }
 
 .paginator a:link,
 .paginator a:visited {
-  padding: 4px 10px !important;
-  border-radius: 6px !important;
+  padding: 5px 10px !important;
+  border-radius: 7px !important;
   background: #f3f4f6 !important;
   color: #111827 !important;
   font-weight: 600 !important;
+  font-size: 0.78rem !important;
   margin: 0 2px !important;
+  text-decoration: none !important;
 }
 
 .paginator a:hover {
@@ -292,15 +455,31 @@ a.deletelink:hover {
   color: #fff !important;
 }
 
-/* ── OBJECT TOOLS (top right add/history buttons) ── */
-ul.object-tools li a {
+.paginator .this-page {
+  background: #111827 !important;
+  color: #fff !important;
+  border-radius: 7px !important;
+  padding: 5px 10px !important;
+  font-weight: 700 !important;
+  font-size: 0.78rem !important;
+}
+
+/* ── OBJECT TOOLS ── */
+ul.object-tools {
+  margin-bottom: 16px !important;
+}
+
+ul.object-tools li a,
+ul.object-tools li a:link,
+ul.object-tools li a:visited {
   background: #111827 !important;
   color: #fff !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   font-size: 0.75rem !important;
   letter-spacing: 0.02em !important;
-  padding: 7px 14px !important;
+  padding: 8px 16px !important;
+  text-decoration: none !important;
 }
 
 ul.object-tools li a:hover {
@@ -308,14 +487,31 @@ ul.object-tools li a:hover {
 }
 
 /* ── FORM FIELDS ── */
-.form-row input,
+.form-row {
+  border-bottom: 1px solid #f3f4f6 !important;
+  padding: 14px 0 !important;
+  color: #374151 !important;
+}
+
+.form-row label {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+}
+
+.form-row input[type=text],
+.form-row input[type=email],
+.form-row input[type=password],
+.form-row input[type=number],
+.form-row input[type=url],
 .form-row select,
 .form-row textarea {
   border: 1px solid #e5e7eb !important;
   border-radius: 8px !important;
-  padding: 8px 12px !important;
+  padding: 9px 12px !important;
   font-size: 0.85rem !important;
   color: #111827 !important;
+  background: #fff !important;
   transition: border-color 0.15s !important;
 }
 
@@ -327,21 +523,34 @@ ul.object-tools li a:hover {
   outline: none !important;
 }
 
+.help {
+  color: #9ca3af !important;
+  font-size: 0.78rem !important;
+  margin-top: 4px !important;
+}
+
 /* ── SUBMIT ROW ── */
 .submit-row {
   background: #f9fafb !important;
-  border-top: 1px solid #e5e7eb !important;
-  border-radius: 0 0 12px 12px !important;
-  padding: 12px 16px !important;
+  border-top: 1px solid #f3f4f6 !important;
+  border-radius: 0 0 14px 14px !important;
+  padding: 14px 20px !important;
+  gap: 8px !important;
 }
 
-/* ── MESSAGES / ALERTS ── */
+/* ── MESSAGES ── */
+ul.messagelist {
+  padding: 0 28px !important;
+  margin-bottom: 16px !important;
+}
+
 ul.messagelist li {
-  border-radius: 8px !important;
-  font-size: 0.82rem !important;
+  border-radius: 10px !important;
+  font-size: 0.83rem !important;
   font-weight: 500 !important;
-  padding: 10px 16px !important;
+  padding: 11px 16px !important;
   margin-bottom: 8px !important;
+  list-style: none !important;
 }
 
 ul.messagelist li.success {
@@ -362,48 +571,73 @@ ul.messagelist li.warning {
   border: 1px solid #fde68a !important;
 }
 
-/* ── RECENT ACTIONS SIDEBAR ── */
+/* ── RECENT ACTIONS ── */
+#recent-actions-list {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 #recent-actions-list li {
   font-size: 0.8rem !important;
-  padding: 5px 0 !important;
+  padding: 8px 16px !important;
   border-bottom: 1px solid #f3f4f6 !important;
   color: #374151 !important;
+  list-style: none !important;
+  background: #ffffff !important;
 }
 
-/* ── DASHBOARD INDEX ── */
-#content-main .module h2 {
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
+#recent-actions-list li:last-child {
+  border-bottom: none !important;
 }
 
-/* ── INLINE STACKED ── */
+#recent-actions-list li a,
+#recent-actions-list li a:link,
+#recent-actions-list li a:visited {
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+
+.actionlist .addlink::before { content: '' !important; }
+
+/* ── INLINE GROUPS ── */
 .inline-group h2 {
   background: #111827 !important;
   color: #f9fafb !important;
-  font-size: 0.7rem !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
-}
-
-/* ── CALENDAR / DATE WIDGET ── */
-.calendarbox,
-.clockbox {
-  border-radius: 12px !important;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12) !important;
-  border: 1px solid #e5e7eb !important;
-}
-
-/* ── REMOVE ADMIN INTERFACE EXTRA CHROME ── */
-#header .environment-badge {
   font-size: 0.65rem !important;
-  border-radius: 4px !important;
-  padding: 2px 7px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  padding: 11px 16px !important;
+}
+
+/* ── CALENDAR WIDGET ── */
+.calendarbox, .clockbox {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.1) !important;
+  border: 1px solid #e5e7eb !important;
+  background: #fff !important;
+}
+
+/* ── CHECKBOX ── */
+input[type=checkbox] {
+  accent-color: #111827 !important;
 }
 
 /* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #f3f4f6; }
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ── DJANGO ADMIN INTERFACE OVERRIDES ── */
+/* Force off any dark styles admin-interface injects */
+[data-theme="dark"] body,
+[data-theme="dark"] #content,
+[data-theme="dark"] #container,
+[data-theme="dark"] .module,
+[data-theme="dark"] td,
+[data-theme="dark"] th,
+[data-theme="dark"] a {
+  background: inherit !important;
+  color: inherit !important;
+}

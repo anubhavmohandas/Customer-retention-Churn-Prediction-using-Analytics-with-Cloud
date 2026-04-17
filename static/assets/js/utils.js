@@ -1,4 +1,4 @@
-/* RetainIQ UI Utilities */
+/* Retain.Ai UI Utilities */
 
 // --- Mobile Sidebar Logic ---
 const sidebar = document.getElementById('sidebar');
