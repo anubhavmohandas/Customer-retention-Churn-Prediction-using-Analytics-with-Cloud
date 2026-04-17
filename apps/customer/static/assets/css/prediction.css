@@ -1,0 +1,17 @@
+/* Churn Card Animation */
+.churn-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.churn-card:hover {
+  background-color: #ef4444 !important;
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(239, 68, 68, 0.2);
+}
+.churn-card:hover .churn-main-text { color: white !important; }
+.churn-card:hover .churn-label { color: rgba(255,255,255,0.7) !important; }
+.churn-card:hover .churn-delta { color: rgba(255,255,255,0.85) !important; }
+
+/* Pulse Indicator */
+.pulse-green { animation: pulse 2s infinite; }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }

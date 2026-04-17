@@ -1,0 +1,79 @@
+/* --- Churn Card Animation --- */
+.churn-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.churn-card:hover {
+  background-color: #ef4444 !important;
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(239, 68, 68, 0.2);
+}
+.churn-card:hover .churn-main-text { color: white !important; }
+.churn-card:hover .churn-label { color: rgba(255,255,255,0.7) !important; }
+.churn-card:hover .churn-delta { color: rgba(255,255,255,0.85) !important; }
+
+/* --- Pulse Indicator --- */
+.pulse-green { animation: pulse 2s infinite; }
+
+@keyframes pulse { 
+    0% { opacity: 1; } 
+    50% { opacity: 0.4; } 
+    100% { opacity: 1; } 
+}
+
+/* --- Custom Sliders --- */
+input[type=range] { appearance: none; background: transparent; width: 100%; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { background: #e5e7eb; height: 6px; border-radius: 10px; }
+.dark input[type=range]::-webkit-slider-runnable-track { background: #333; }
+input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; background: black; border-radius: 50%; margin-top: -6px; border: 2px solid white; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+.dark input[type=range]::-webkit-slider-thumb { background: white; border: 2px solid black; }
+input[type=range]::-moz-range-track { background: #e5e7eb; height: 6px; border-radius: 10px; }
+.dark input[type=range]::-moz-range-track { background: #333; }
+input[type=range]::-moz-range-thumb { height: 18px; width: 18px; background: black; border-radius: 50%; border: 2px solid white; cursor: pointer; }
+.dark input[type=range]::-moz-range-thumb { background: white; border: 2px solid black; }
+
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type=range] { flex: 1; }
+.slider-val { min-width: 36px; text-align: right; font-size: 13px; font-weight: 700; color: #111827; }
+.dark .slider-val { color: #f9fafb; }
+
+/* --- File Upload Drag & Drop Styling --- */
+.file-drop-zone { transition: all 0.2s ease; }
+.file-drop-zone.dragover {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-color: #3b82f6;
+}
+.dark .file-drop-zone.dragover { background-color: rgba(59, 130, 246, 0.1); }
+
+/* --- Tab Styling --- */
+.tab-btn {
+  color: #9ca3af;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+.tab-btn.active {
+  color: #111827;
+  border-bottom-color: #111827;
+}
+.dark .tab-btn.active {
+  color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
+/* --- Animations --- */
+@keyframes fadeIn { 
+    from { opacity: 0; transform: translateY(10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+.animate-fade-in { animation: fadeIn 0.4s ease forwards; }
+
+@keyframes spin { 
+    to { transform: rotate(360deg); } 
+}
+.spinner { border: 2px solid rgba(0,0,0,0.1); border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+/* --- Custom Scrollbar for Data Table --- */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; }

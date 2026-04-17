@@ -1,0 +1,146 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetainIQ — Report History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'assets/css/global.css' %}">
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; }
+
+    .c-critical { color: #ef4444; }
+    .c-warning  { color: #eab308; }
+    .c-stable   { color: #10b981; }
+
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+
+<body class="flex min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
+
+  {% include 'sidebar.html' %}
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
+
+      <header class="flex flex-col md:flex-row justify-between items-start gap-4 mb-10">
+        <div>
+          <div class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-gray-400 dark:text-zinc-500 mb-1">Intelligence Archives</div>
+          <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight dark:text-white">Report History</h2>
+          <p class="text-gray-500 dark:text-zinc-400 mt-1 font-medium">Monitoring frozen snapshots across {{ total_sims|default:"0" }} sessions (30-day retention).</p>
+        </div>
+        <button class="bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:scale-95 transition-all no-print" onclick="window.print()">
+          Export PDF
+        </button>
+      </header>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-12">
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-[24px] border border-gray-100 dark:border-zinc-800">
+          <div class="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 dark:text-zinc-500 mb-3">Total Sessions</div>
+          <div class="text-4xl font-extrabold dark:text-white leading-none tracking-tighter">{{ total_sims|default:"0" }}</div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-[24px] border border-gray-100 dark:border-zinc-800">
+          <div class="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 dark:text-zinc-500 mb-3">Records Scanned</div>
+          <div class="text-4xl font-extrabold dark:text-white leading-none tracking-tighter">{{ total_records|default:"0" }}</div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-[24px] border border-gray-100 dark:border-zinc-800">
+          <div class="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 dark:text-zinc-500 mb-3">Critical Alerts</div>
+          <div class="text-4xl font-extrabold c-critical leading-none tracking-tighter">{{ critical_count|default:"0" }}</div>
+        </div>
+
+        <div class="bg-black dark:bg-white p-6 rounded-[24px] shadow-xl">
+          <div class="text-[10px] font-extrabold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-3">Avg Batch Risk</div>
+          <div class="text-4xl font-extrabold text-white dark:text-black leading-none tracking-tighter">{{ avg_risk|default:"0.0" }}%</div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-[32px] overflow-hidden shadow-sm">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left border-collapse min-w-[900px]">
+            <thead class="bg-gray-50/50 dark:bg-zinc-800/50 border-b border-gray-100 dark:border-zinc-800">
+              <tr>
+                <th class="px-8 py-5 text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Snapshot / Expiry</th>
+                <th class="px-8 py-5 text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Execution Details</th>
+                <th class="px-8 py-5 text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Model Engine</th>
+                <th class="px-8 py-5 text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-widest text-right">Batch Risk Score</th>
+              </tr>
+            </thead>
+            <tbody id="report-body" class="divide-y divide-gray-50 dark:divide-zinc-800">
+              {% for report in reports %}
+              <tr class="report-row hover:bg-gray-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+
+                <td class="px-8 py-6">
+                  <div class="flex flex-col">
+                    <span class="font-bold text-black dark:text-white text-sm">{{ report.batch_name }}</span>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                        {{ report.created_at|date:"d M Y" }}
+                      </span>
+                      <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full
+                        {% if report.days_remaining < 5 %}bg-red-500/10 text-red-500{% else %}bg-emerald-500/10 text-emerald-500{% endif %}">
+                        Expires in {{ report.days_remaining }}d
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="px-8 py-6">
+                  <div class="flex flex-col">
+                    <span class="font-bold text-black dark:text-white text-sm">{{ report.total_records }} Rows Processed</span>
+                    <span class="text-[11px] text-gray-400 font-bold mt-1 truncate max-w-[200px]">{{ report.source_file }}</span>
+                  </div>
+                </td>
+
+                <td class="px-8 py-6">
+                  <span class="text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-zinc-400">
+                    {{ report.model_version }}
+                  </span>
+                </td>
+
+                <td class="px-8 py-6 text-right">
+                  <div class="text-2xl font-extrabold tracking-tighter
+                    {% if report.avg_risk_score >= 0.7 %}c-critical
+                    {% elif report.avg_risk_score >= 0.3 %}c-warning
+                    {% else %}c-stable{% endif %}">
+                    {{ report.avg_risk_score|floatformat:1 }}%
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="px-8 py-20 text-center text-gray-400 font-bold uppercase tracking-widest text-sm">
+                  No archived snapshots available
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="{% static 'assets/js/main.js' %}"></script>
+</body>
+</html>

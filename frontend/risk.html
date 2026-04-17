@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetainIQ — Risk Analysis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="static/assets/css/global.css">
+</head>
+<body class="flex min-h-screen">
+  <div id="sidebar-overlay" aria-hidden="true" onclick="closeSidebar()"></div>
+
+  <aside id="sidebar" class="w-72 bg-white dark:bg-[#0d0d0d] border-r border-gray-100 dark:border-zinc-800 flex flex-col h-screen p-8 transition-colors overflow-y-auto">
+    <div class="flex items-center gap-3 mb-12">
+      <div class="w-10 h-10 bg-black dark:bg-white rounded-2xl flex items-center justify-center rotate-3 flex-shrink-0">
+        <div class="w-4 h-4 bg-white dark:bg-black rounded-full"></div>
+      </div>
+      <h1 class="text-xl font-extrabold tracking-tighter dark:text-white">RETAIN.AI</h1>
+    </div>
+
+    <nav class="space-y-1 flex-1" role="navigation">
+      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Workspace</p>
+      <a href="dashboard.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Dashboard</a>
+      <a href="prediction.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Prediction Engine</a>
+      <a href="reports.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Report History</a>
+      <a href="risk.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold text-sm active">Risk Analysis</a>
+      <a href="models.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">AI Models</a>
+      <a href="settings.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Settings</a>
+
+      <div class="mt-8">
+        <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Account</p>
+        <div class="flex items-center gap-3 px-6 py-2 mb-2">
+          <div class="w-8 h-8 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center font-bold text-xs dark:text-white border border-gray-200 dark:border-zinc-700">AS</div>
+          <span class="font-bold text-sm dark:text-white">Aarav Shah</span>
+        </div>
+        <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4 mt-6">Appearance</p>
+        <button id="themeToggle" class="w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+          <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
+        </button>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="lg:hidden flex items-center justify-between px-6 py-4 bg-white dark:bg-[#0d0d0d] border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-20">
+      <button onclick="openSidebar()" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </header>
+
+    <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
+      <header class="mb-10">
+        <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 dark:text-white">Risk Intelligence</h2>
+        <p class="text-gray-500 dark:text-zinc-400">Advanced attribution analysis of at-risk accounts.</p>
+      </header>
+      <div class="bg-white dark:bg-zinc-900 curved border border-gray-100 dark:border-zinc-800 overflow-hidden">
+        <div class="table-scroll">
+          <table class="w-full text-left min-w-[560px]">
+            <thead class="bg-gray-50 dark:bg-zinc-800/50">
+              <tr class="text-[10px] font-bold uppercase text-gray-400 dark:text-zinc-500 tracking-widest">
+                <th class="px-8 py-5" scope="col">Customer</th>
+                <th class="px-8 py-5" scope="col">Churn Risk</th>
+                <th class="px-8 py-5" scope="col">Primary Driver</th>
+                <th class="px-8 py-5 text-right" scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50 dark:divide-zinc-800">
+              <tr class="dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                <td class="px-8 py-5 font-bold dark:text-white">TechMate Inc.</td>
+                <td class="px-8 py-5"><span class="text-red-500 font-extrabold text-lg">92%</span></td>
+                <td class="px-8 py-5 text-sm italic text-gray-500 dark:text-zinc-400">Low Feature Adoption</td>
+                <td class="px-8 py-5 text-right">
+                  <button class="bg-black dark:bg-white dark:text-black text-white px-4 py-2 rounded-xl text-xs font-bold hover:scale-95 transition-transform">
+                    Initiate Save
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="static/assets/js/main.js"></script>
+</body>
+</html>

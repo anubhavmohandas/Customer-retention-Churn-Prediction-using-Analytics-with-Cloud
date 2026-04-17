@@ -1,0 +1,129 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetainIQ — Risk Analysis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'assets/css/global.css' %}">
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+
+<body class="flex min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
+
+  {% include 'sidebar.html' %}
+
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="lg:hidden flex items-center justify-between px-6 py-4 bg-white dark:bg-[#0d0d0d] border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-20 no-print">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-black dark:bg-white rounded-xl flex items-center justify-center rotate-3">
+          <div class="w-3 h-3 bg-white dark:bg-black rounded-full"></div>
+        </div>
+        <span class="text-base font-extrabold tracking-tighter dark:text-white">RETAIN.AI</span>
+      </div>
+      <button onclick="openSidebar()" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </header>
+
+    <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
+
+      <header class="mb-10">
+        <div class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-gray-400 dark:text-zinc-500 mb-1">Pattern Recognition</div>
+        <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight dark:text-white">Risk Analysis</h2>
+        <p class="text-gray-500 dark:text-zinc-400 mt-1 font-medium">Identifying structural churn drivers across your subscriber segments.</p>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+
+        <div class="lg:col-span-1 bg-black dark:bg-white p-8 rounded-[32px] text-white dark:text-black shadow-2xl flex flex-col justify-between">
+          <div>
+            <h3 class="text-[10px] font-black uppercase tracking-widest mb-8 opacity-50">Financial Impact</h3>
+            <div class="space-y-10">
+              <div>
+                <p class="text-xs font-bold opacity-50 mb-2">Total Monthly Revenue (MRR)</p>
+                <p class="text-5xl font-black tracking-tighter">${{ total_mrr|default:"0" }}k</p>
+              </div>
+              <div class="border-l-4 border-red-500 pl-6">
+                <p class="text-xs font-bold text-red-500 mb-2 uppercase tracking-widest">At Critical Risk (>70%)</p>
+                <p class="text-5xl font-black tracking-tighter text-red-500">${{ revenue_at_risk|default:"0" }}k</p>
+              </div>
+            </div>
+          </div>
+
+          <a href="{% url 'export_risk_list' %}"
+             class="mt-12 w-full inline-block text-center py-5 bg-white/10 dark:bg-black/5 hover:bg-white/20 dark:hover:bg-black/10 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all no-print">
+            Download Risk List (CSV)
+          </a>
+        </div>
+
+        <div class="lg:col-span-2 bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-gray-100 dark:border-zinc-800 shadow-sm flex flex-col">
+          <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8">Subscriber Risk Clusters (Tenure vs. Charges)</h3>
+          <div class="flex-1 min-h-[300px] relative">
+             <canvas id="correlationChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <div class="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-gray-100 dark:border-zinc-800 shadow-sm">
+          <div class="flex justify-between items-center mb-8">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400">Avg Risk by Contract</h3>
+            <span class="text-[9px] bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded font-bold text-gray-400 uppercase tracking-widest">Live Aggregates</span>
+          </div>
+          <div class="h-64">
+            <canvas id="contractRiskChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-gray-100 dark:border-zinc-800 shadow-sm">
+          <div class="flex justify-between items-center mb-8">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400">Subscriber Survival Curve</h3>
+            <span class="text-[9px] bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded font-bold text-emerald-600 uppercase tracking-widest">Network Trend</span>
+          </div>
+          <div class="h-64">
+            <canvas id="survivalChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script id="analysis-data" type="application/json">
+    {
+      "contractLabels": {{ contract_labels_json|safe }},
+      "contractValues": {{ contract_values_json|safe }},
+      "correlationData": {{ correlation_data_json|safe }}
+    }
+  </script>
+
+  <script src="{% static 'assets/js/main.js' %}"></script>
+  <script src="{% static 'assets/js/analysis.js' %}"></script>
+</body>
+</html>

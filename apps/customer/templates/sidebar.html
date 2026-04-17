@@ -1,0 +1,48 @@
+{% load static %}
+<div id="sidebar-overlay" aria-hidden="true" onclick="closeSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden"></div>
+
+<aside id="sidebar" class="w-72 bg-white dark:bg-[#0d0d0d] border-r border-gray-100 dark:border-zinc-800 flex flex-col h-screen p-8 transition-colors overflow-y-auto z-40 fixed lg:relative -translate-x-full lg:translate-x-0 transition-transform duration-300">
+  <div class="flex items-center gap-3 mb-12">
+    <div class="w-10 h-10 bg-black dark:bg-white rounded-2xl flex items-center justify-center rotate-3 flex-shrink-0">
+      <div class="w-4 h-4 bg-white dark:bg-black rounded-full"></div>
+    </div>
+    <h1 class="text-xl font-extrabold tracking-tighter dark:text-white">RETAIN.AI</h1>
+  </div>
+
+  <nav class="space-y-1 flex-1" role="navigation">
+    <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Workspace</p>
+
+    <a href="{% url 'dashboard_page' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold text-sm {% if request.resolver_match.url_name == 'dashboard_page' %}bg-gray-100 dark:bg-zinc-800 text-black dark:text-white{% else %}text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50{% endif %}">
+      Dashboard
+    </a>
+
+    <a href="{% url 'prediction_page' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold text-sm transition {% if request.resolver_match.url_name == 'prediction_page' %}bg-gray-100 dark:bg-zinc-800 text-black dark:text-white{% else %}text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50{% endif %}">
+      Prediction Engine
+    </a>
+
+    <a href="{% url 'report_history' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+      Report History
+    </a>
+
+    <a href="{% url 'risk_analysis' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Risk Analysis</a>
+    <a href="{% url 'ai_models_page' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">AI Models</a>
+    <a href="{% url 'settings_page' %}" class="nav-link w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold text-sm transition {% if request.resolver_match.url_name == 'settings_page' %}active bg-gray-100 dark:bg-zinc-800 text-black dark:text-white{% else %}text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50{% endif %}">
+    Settings
+  </a>
+
+    <div class="mt-8">
+      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Account</p>
+      <div class="flex items-center gap-3 px-6 py-2 mb-2">
+        <div class="w-8 h-8 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center font-bold text-xs dark:text-white border border-gray-200 dark:border-zinc-700">
+          {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
+        </div>
+        <span class="font-bold text-sm dark:text-white">{{ request.user.get_full_name|default:request.user.username }}</span>
+      </div>
+
+      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4 mt-6">Appearance</p>
+      <button id="themeToggle" class="w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+        <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
+      </button>
+    </div>
+  </nav>
+</aside>

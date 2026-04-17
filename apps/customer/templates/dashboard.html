@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetainIQ — Telecom Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/css/global.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/css/prediction.css' %}">
+</head>
+<body class="flex min-h-screen bg-white dark:bg-[#050505]">
+
+  {% include 'sidebar.html' %}
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="lg:hidden flex items-center justify-between px-6 py-4 bg-white dark:bg-[#0d0d0d] border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-20">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-black dark:bg-white rounded-xl flex items-center justify-center rotate-3">
+          <div class="w-3 h-3 bg-white dark:bg-black rounded-full"></div>
+        </div>
+        <span class="text-base font-extrabold tracking-tighter dark:text-white">RETAIN.AI</span>
+      </div>
+      <button onclick="openSidebar()" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </header>
+
+    <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
+      <header class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 mb-10">
+        <div>
+          <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 dark:text-white">Telecom Churn Overview</h2>
+          <p class="text-gray-500 dark:text-zinc-400 flex items-center gap-2">
+            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            Network metrics powered by <span class="font-bold text-black dark:text-white ml-1">RF_CORE_V1</span>
+          </p>
+        </div>
+        <a href="{% url 'prediction_page' %}" class="bg-black dark:bg-white dark:text-black text-white px-6 py-3.5 md:px-8 md:py-4 curved font-bold text-sm hover:scale-95 transition-all shadow-xl shadow-black/10 self-start sm:self-auto whitespace-nowrap inline-block text-center">
+          Analyze New Batch
+        </a>
+      </header>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-12">
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800">
+          <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">High-Risk Accounts</p>
+          <div class="flex items-end gap-3">
+            <h3 class="text-5xl font-extrabold leading-none dark:text-white">{{ high_risk_count|default:"0" }}</h3>
+          </div>
+        </div>
+
+        <div class="bg-black dark:bg-white p-8 curved shadow-2xl">
+          <p class="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4">MRR At Flight Risk</p>
+          <h3 class="text-5xl font-extrabold leading-none text-white dark:text-black">${{ mrr_at_risk|floatformat:1 }}k</h3>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800">
+          <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">Potential Save</p>
+          <div class="flex items-end gap-3">
+            <h3 class="text-5xl font-extrabold dark:text-white text-emerald-500">${{ potential_recovery|floatformat:1 }}k</h3>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800">
+          <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">Total Predictions</p>
+          <h3 class="text-5xl font-extrabold dark:text-white">{{ total_predictions|default:"0" }}</h3>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800 lg:col-span-1">
+          <h3 class="text-lg font-extrabold dark:text-white mb-6">Risk by Contract Type</h3>
+          <div class="space-y-6">
+            {% for item in contract_stats %}
+            <div>
+              <div class="flex justify-between text-sm font-bold mb-2">
+                <span class="dark:text-white">{{ item.contract_type }}</span>
+                <span class="text-{{ item.color }}">
+                  {{ item.risk_percent }}% Risk
+                </span>
+              </div>
+              <div class="w-full bg-gray-100 dark:bg-zinc-800 h-3 rounded-full overflow-hidden">
+                <div class="h-full bg-{{ item.color }}"
+                     style="width: {{ item.risk_percent }}%"></div>
+              </div>
+            </div>
+            {% empty %}
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">No Data Available</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 curved border border-gray-100 dark:border-zinc-800 lg:col-span-2 flex flex-col overflow-hidden">
+          <div class="p-8 border-b border-gray-100 dark:border-zinc-800">
+            <h3 class="text-lg font-extrabold dark:text-white">Priority Retention Queue</h3>
+          </div>
+          <div class="overflow-x-auto flex-1">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+              <thead class="bg-gray-50 dark:bg-zinc-800/50 text-gray-500 dark:text-zinc-400 uppercase font-bold text-xs tracking-wider">
+                <tr>
+                  <th class="px-8 py-4">Subscriber ID</th>
+                  <th class="px-8 py-4">Monthly Bill</th>
+                  <th class="px-8 py-4">Flight Risk</th>
+                  <th class="px-8 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50 dark:divide-zinc-800">
+                {% for report in priority_queue %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-8 py-5">
+                    <div class="font-mono font-bold dark:text-white">{{ report.subscriber_id }}</div>
+                    <div class="text-[10px] text-gray-400 font-bold uppercase">{{ report.contract_type }}</div>
+                  </td>
+                  <td class="px-8 py-5 dark:text-zinc-300 font-bold">${{ report.monthly_charges|floatformat:2 }}</td>
+                  <td class="px-8 py-5">
+                    <span class="{% if report.risk_score >= 0.7 %}text-red-500{% else %}text-yellow-500{% endif %} font-black">
+                      {{ report.risk_percent }}%
+                    </span>
+                  </td>
+                  <td class="px-8 py-5 text-right">
+                    <button class="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-95 transition">
+                      Draft Offer
+                    </button>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="px-8 py-10 text-center text-gray-400 font-bold uppercase tracking-widest">No critical accounts detected</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="{% static 'assets/js/main.js' %}"></script>
+</body>
+</html>

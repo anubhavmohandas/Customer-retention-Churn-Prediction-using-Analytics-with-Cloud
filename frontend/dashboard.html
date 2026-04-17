@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetainIQ — Telecom Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="static/assets/css/dashboard.css">
+  <link rel="stylesheet" href="static/assets/css/global.css">
+  <link rel="stylesheet" href="static/assets/css/prediction.css">
+</head>
+<body class="flex min-h-screen">
+  <div id="sidebar-overlay" aria-hidden="true" onclick="closeSidebar()"></div>
+
+  <aside id="sidebar" class="w-72 bg-white dark:bg-[#0d0d0d] border-r border-gray-100 dark:border-zinc-800 flex flex-col h-screen p-8 transition-colors overflow-y-auto">
+    <div class="flex items-center gap-3 mb-12">
+      <div class="w-10 h-10 bg-black dark:bg-white rounded-2xl flex items-center justify-center rotate-3 flex-shrink-0">
+        <div class="w-4 h-4 bg-white dark:bg-black rounded-full"></div>
+      </div>
+      <h1 class="text-xl font-extrabold tracking-tighter dark:text-white">RETAIN.AI</h1>
+    </div>
+
+    <nav class="space-y-1 flex-1" role="navigation">
+      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Workspace</p>
+      <a href="dashboard.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold text-sm active">Dashboard</a>
+      <a href="prediction.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Prediction Engine</a>
+      <a href="reports.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Report History</a>
+      <a href="risk.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Risk Analysis</a>
+      <a href="models.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">AI Models</a>
+      <a href="settings.html" class="nav-link w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">Settings</a>
+
+      <div class="mt-8">
+        <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Account</p>
+        <div class="flex items-center gap-3 px-6 py-2 mb-2">
+          <div class="w-8 h-8 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center font-bold text-xs dark:text-white border border-gray-200 dark:border-zinc-700">AS</div>
+          <span class="font-bold text-sm dark:text-white">Aarav Shah</span>
+        </div>
+        <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4 mt-6">Appearance</p>
+        <button id="themeToggle" class="w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+          <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
+        </button>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="lg:hidden flex items-center justify-between px-6 py-4 bg-white dark:bg-[#0d0d0d] border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-20">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-black dark:bg-white rounded-xl flex items-center justify-center rotate-3">
+          <div class="w-3 h-3 bg-white dark:bg-black rounded-full"></div>
+        </div>
+        <span class="text-base font-extrabold tracking-tighter dark:text-white">RETAIN.AI</span>
+      </div>
+      <button onclick="openSidebar()" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </header>
+
+    <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
+      <header class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 mb-10">
+        <div>
+          <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 dark:text-white">Telecom Churn Overview</h2>
+          <p class="text-gray-500 dark:text-zinc-400 flex items-center gap-2">
+            <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-green"></span>
+            Network metrics powered by <span class="font-bold text-black dark:text-white ml-1">Ensemble AI</span>
+          </p>
+        </div>
+        <a href="prediction.html" class="bg-black dark:bg-white dark:text-black text-white px-6 py-3.5 md:px-8 md:py-4 curved font-bold text-sm hover:scale-95 transition-all shadow-xl shadow-black/10 self-start sm:self-auto whitespace-nowrap inline-block text-center">
+          Analyze New Batch
+        </a>
+      </header>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-12">
+        
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800 churn-card" onclick="window.location.href='risk.html'">
+          <p class="churn-label text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">High-Risk Accounts</p>
+          <div class="flex items-end gap-3">
+            <h3 class="churn-main-text text-5xl font-extrabold leading-none dark:text-white">1,842</h3>
+            <span class="churn-delta text-red-500 font-bold text-xs mb-1">↑ 12%</span>
+          </div>
+        </div>
+
+        <div class="bg-black dark:bg-white p-8 curved shadow-2xl">
+          <p class="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4">MRR At Flight Risk</p>
+          <h3 class="text-5xl font-extrabold leading-none text-white dark:text-black">$142.5k</h3>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800">
+          <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">Network Churn Rate</p>
+          <div class="flex items-end gap-3">
+            <h3 class="text-5xl font-extrabold dark:text-white">2.4<span class="text-lg">%</span></h3>
+            <span class="text-emerald-500 font-bold text-xs mb-1">Stable</span>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800">
+          <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">Pending Retention Offers</p>
+          <h3 class="text-5xl font-extrabold dark:text-white">211</h3>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="bg-white dark:bg-zinc-900 p-8 curved border border-gray-100 dark:border-zinc-800 lg:col-span-1">
+          <h3 class="text-lg font-extrabold dark:text-white mb-6">Risk by Contract Type</h3>
+          
+          <div class="space-y-6">
+            <div>
+              <div class="flex justify-between text-sm font-bold mb-2"><span class="dark:text-white">Month-to-Month</span><span class="text-red-500">Critical</span></div>
+              <div class="w-full bg-gray-100 dark:bg-zinc-800 h-3 rounded-full overflow-hidden"><div class="bg-red-500 h-full w-[65%]"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm font-bold mb-2"><span class="dark:text-white">One Year Contract</span><span class="text-yellow-500">Moderate</span></div>
+              <div class="w-full bg-gray-100 dark:bg-zinc-800 h-3 rounded-full overflow-hidden"><div class="bg-yellow-500 h-full w-[25%]"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm font-bold mb-2"><span class="dark:text-white">Two Year Contract</span><span class="text-emerald-500">Stable</span></div>
+              <div class="w-full bg-gray-100 dark:bg-zinc-800 h-3 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full w-[10%]"></div></div>
+            </div>
+          </div>
+          
+          <div class="mt-8 p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-xl border border-gray-100 dark:border-zinc-700 text-center">
+            <p class="text-xs text-gray-600 dark:text-zinc-400 font-bold leading-relaxed">65% of predicted churn stems from Month-to-Month users.</p>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-zinc-900 curved border border-gray-100 dark:border-zinc-800 lg:col-span-2 flex flex-col overflow-hidden">
+          <div class="p-8 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center">
+            <h3 class="text-lg font-extrabold dark:text-white">Priority Retention Queue</h3>
+          </div>
+          
+          <div class="overflow-x-auto flex-1 custom-scrollbar">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+              <thead class="bg-gray-50 dark:bg-zinc-800/50 text-gray-500 dark:text-zinc-400 uppercase font-bold text-xs tracking-wider">
+                <tr>
+                  <th class="px-8 py-4">Subscriber ID</th>
+                  <th class="px-8 py-4">Service Plan</th>
+                  <th class="px-8 py-4">Tenure</th>
+                  <th class="px-8 py-4">Flight Risk</th>
+                  <th class="px-8 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50 dark:divide-zinc-800 dark:text-zinc-300">
+                <tr class="hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-8 py-5 font-mono font-bold dark:text-white">SUB-8492-TEL</td>
+                  <td class="px-8 py-5">DSL / Month-to-Month</td>
+                  <td class="px-8 py-5 text-gray-500">4 Months</td>
+                  <td class="px-8 py-5"><span class="text-red-500 font-bold">92%</span></td>
+                  <td class="px-8 py-5 text-right"><button class="text-xs font-bold text-black dark:text-white hover:underline">Draft Offer</button></td>
+                </tr>
+                <tr class="hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-8 py-5 font-mono font-bold dark:text-white">SUB-1102-FIB</td>
+                  <td class="px-8 py-5">Fiber / One Year</td>
+                  <td class="px-8 py-5 text-gray-500">11 Months</td>
+                  <td class="px-8 py-5"><span class="text-red-500 font-bold">85%</span></td>
+                  <td class="px-8 py-5 text-right"><button class="text-xs font-bold text-black dark:text-white hover:underline">Draft Offer</button></td>
+                </tr>
+                <tr class="hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-8 py-5 font-mono font-bold dark:text-white">SUB-3391-MOB</td>
+                  <td class="px-8 py-5">Mobile + DSL Bundle</td>
+                  <td class="px-8 py-5 text-gray-500">2 Months</td>
+                  <td class="px-8 py-5"><span class="text-yellow-500 font-bold">58%</span></td>
+                  <td class="px-8 py-5 text-right"><button class="text-xs font-bold text-black dark:text-white hover:underline">Monitor</button></td>
+                </tr>
+                 <tr class="hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-8 py-5 font-mono font-bold dark:text-white">SUB-9921-FIB</td>
+                  <td class="px-8 py-5">Fiber / Two Year</td>
+                  <td class="px-8 py-5 text-gray-500">18 Months</td>
+                  <td class="px-8 py-5"><span class="text-emerald-500 font-bold">12%</span></td>
+                  <td class="px-8 py-5 text-right"><button class="text-xs font-bold text-gray-400 cursor-not-allowed">No Action</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="static/assets/js/main.js"></script>
+</body>
+</html>

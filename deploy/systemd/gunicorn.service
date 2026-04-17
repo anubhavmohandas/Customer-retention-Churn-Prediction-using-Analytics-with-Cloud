@@ -1,0 +1,32 @@
+[Unit]
+Description=gunicorn daemon for churn_prediction
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+RuntimeDirectory=gunicorn
+WorkingDirectory=/opt/churn_prediction
+EnvironmentFile=/opt/churn_prediction/.env
+ExecStart=/opt/churn_prediction/.venv/bin/gunicorn \
+          --config /opt/churn_prediction/deploy/gunicorn.conf.py \
+          churn_prediction.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+PrivateTmp=true
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

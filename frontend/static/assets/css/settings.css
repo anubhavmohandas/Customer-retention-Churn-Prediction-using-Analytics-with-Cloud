@@ -1,0 +1,11 @@
+/* Specific styling for settings forms.
+  Currently handled by Tailwind utility classes in the HTML.
+*/
+
+/* Example: Add a slight focus glow to settings inputs */
+input:focus {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+.dark input:focus {
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.05);
+}

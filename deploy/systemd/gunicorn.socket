@@ -1,0 +1,11 @@
+[Unit]
+Description=gunicorn socket for churn_prediction
+
+[Socket]
+ListenStream=/run/gunicorn/churn.sock
+SocketUser=www-data
+SocketGroup=www-data
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target
