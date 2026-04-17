@@ -31,15 +31,7 @@
   </a>
 
     <div class="mt-8">
-      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Account</p>
-      <div class="flex items-center gap-3 px-6 py-2 mb-2">
-        <div class="w-8 h-8 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center font-bold text-xs dark:text-white border border-gray-200 dark:border-zinc-700">
-          {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
-        </div>
-        <span class="font-bold text-sm dark:text-white">{{ request.user.get_full_name|default:request.user.username }}</span>
-      </div>
-
-      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4 mt-6">Appearance</p>
+      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4 ml-4">Appearance</p>
       <button id="themeToggle" class="w-full flex items-center gap-3 px-6 py-4 text-gray-500 dark:text-zinc-400 rounded-2xl font-semibold text-sm transition hover:bg-gray-50 dark:hover:bg-zinc-800/50">
         <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
       </button>
