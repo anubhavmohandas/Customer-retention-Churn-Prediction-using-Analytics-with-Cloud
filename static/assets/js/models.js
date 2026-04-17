@@ -69,9 +69,9 @@ function switchModel(modelKey) {
  */
 function updateTabStyling(activeKey) {
     const tabMap = {
-        'decision_tree': 'tab-dt',
-        'random_forest': 'tab-rf',
-        'xgboost': 'tab-xgb'
+        'logistic_regression': 'tab-lr',
+        'random_forest':       'tab-rf',
+        'xgboost':             'tab-xgb',
     };
 
     // Remove active styles from all tabs

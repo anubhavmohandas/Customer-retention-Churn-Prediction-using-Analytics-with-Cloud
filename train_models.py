@@ -1,107 +1,188 @@
-import pandas as pd
-import numpy as np
-import pickle
+"""
+Telco Customer Churn — Full Pipeline
+EDA → Preprocessing (One-Hot + StandardScaler + stratify) → SMOTE → Train → Evaluate → Save
+"""
+
 import os
+import pickle
 import json
-from sklearn.preprocessing import LabelEncoder
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBRFClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
-    f1_score, confusion_matrix, roc_curve, roc_auc_score
+    f1_score, confusion_matrix, roc_curve, roc_auc_score,
 )
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from xgboost import XGBRFClassifier
 
-# 1. Load Dataset
-DATA_PATH = "dataset/TelecoCustomerChurn.csv"
+warnings.filterwarnings("ignore")
+
+# ─────────────────────────────────────────────
+# 0. Setup
+# ─────────────────────────────────────────────
+DATA_PATH  = "dataset/TelecoCustomerChurn.csv"
+MODELS_DIR = "models"
+PLOTS_DIR  = "plots"
+
+for d in [MODELS_DIR, PLOTS_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+PALETTE = {"No": "#2ecc71", "Yes": "#e74c3c"}
+plt.rcParams.update({"figure.dpi": 120, "axes.spines.top": False,
+                     "axes.spines.right": False})
+
+# ─────────────────────────────────────────────
+# 1. Load
+# ─────────────────────────────────────────────
 if not os.path.exists(DATA_PATH):
-    print(f"❌ Error: {DATA_PATH} not found.")
-    exit()
+    raise FileNotFoundError(f"❌ Dataset not found at '{DATA_PATH}'")
 
-df = pd.read_csv(DATA_PATH)
+df_raw = pd.read_csv(DATA_PATH)
+print("=" * 60)
+print(f"✅ Loaded dataset: {df_raw.shape[0]:,} rows × {df_raw.shape[1]} columns")
+print("=" * 60)
 
-# 2. Data Cleaning
-df = df.drop(columns=["customerID"])
-df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce').fillna(0)
+# ─────────────────────────────────────────────
+# 2. Cleaning
+# ─────────────────────────────────────────────
+df = df_raw.copy()
+df.drop(columns=["customerID"], inplace=True)
+df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+df.dropna(subset=["TotalCharges"], inplace=True)
+df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0}).astype(int)
+df.reset_index(drop=True, inplace=True)
+print(f"\n✅ After cleaning: {df.shape[0]:,} rows × {df.shape[1]} columns")
 
-# 3. Categorical Encoding
-object_columns = df.select_dtypes(include=["object", "string"]).columns
-encoders = {}
+# ─────────────────────────────────────────────
+# 3. EDA Plots
+# ─────────────────────────────────────────────
+print("\n📊 Generating EDA plots ...")
 
-for column in object_columns:
-    if column != "Churn":
-        le = LabelEncoder()
-        df[column] = le.fit_transform(df[column])
-        encoders[column] = le
+churn_labels = df_raw["Churn"].value_counts()
 
-# 4. Target formatting
-df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0})
-df = df.dropna(subset=["Churn"])
-df["Churn"] = df["Churn"].astype(np.int64)
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].bar(churn_labels.index, churn_labels.values,
+            color=[PALETTE["No"], PALETTE["Yes"]], edgecolor="white", width=0.5)
+axes[0].set_title("Churn Count", fontweight="bold")
+axes[0].set_ylabel("Customers")
+for i, v in enumerate(churn_labels.values):
+    axes[0].text(i, v + 30, f"{v:,}", ha="center", fontsize=10)
 
-# 5. Split Data
+pct = churn_labels / churn_labels.sum() * 100
+axes[1].pie(pct.values, labels=pct.index, autopct="%1.1f%%",
+            colors=[PALETTE["No"], PALETTE["Yes"]],
+            startangle=90, wedgeprops=dict(edgecolor="white"))
+axes[1].set_title("Churn Share", fontweight="bold")
+plt.suptitle("Target Variable — Churn", fontsize=13, fontweight="bold", y=1.01)
+plt.tight_layout()
+plt.savefig(f"{PLOTS_DIR}/01_churn_distribution.png", bbox_inches="tight")
+plt.close()
+
+# Correlation heatmap (label-encode for plotting only — not for model training)
+df_corr = df.copy()
+obj_cols = df_corr.select_dtypes(include=["object", "string"]).columns
+for c in obj_cols:
+    df_corr[c] = LabelEncoder().fit_transform(df_corr[c].astype(str))
+corr = df_corr.corr()
+
+fig, ax = plt.subplots(figsize=(16, 13))
+mask = np.triu(np.ones_like(corr, dtype=bool))
+sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap="coolwarm",
+            linewidths=0.5, vmin=-1, vmax=1, ax=ax, annot_kws={"size": 7})
+ax.set_title("Feature Correlation Heatmap", fontsize=14, fontweight="bold")
+plt.tight_layout()
+plt.savefig(f"{PLOTS_DIR}/04_correlation_heatmap.png", bbox_inches="tight")
+plt.close()
+print(f"  ✅ Saved plots to {PLOTS_DIR}/")
+
+# ─────────────────────────────────────────────
+# 4. Preprocessing
+# ─────────────────────────────────────────────
+print("\n🔧 Preprocessing ...")
+
 X = df.drop(columns=["Churn"])
 y = df["Churn"]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# ONE-HOT ENCODING: no fake ordinal relationships imposed on categoricals
+cat_cols = X.select_dtypes(include=["object", "string"]).columns.tolist()
+X_encoded = pd.get_dummies(X, columns=cat_cols, drop_first=False).astype(float)
 
-# 6. SMOTE on training set only
-print("⚖️ Applying SMOTE to balance classes...")
+# STRATIFIED SPLIT: preserves 73/27 churn ratio in both train and test sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X_encoded, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# STANDARD SCALING: required for Logistic Regression convergence
+num_cols = ["tenure", "MonthlyCharges", "TotalCharges"]
+scaler = StandardScaler()
+X_train[num_cols] = scaler.fit_transform(X_train[num_cols])
+X_test[num_cols]  = scaler.transform(X_test[num_cols])
+
+print(f"  Train: {X_train.shape[0]:,} | Test: {X_test.shape[0]:,}")
+print(f"  Features: {X_encoded.shape[1]} (after One-Hot Encoding)")
+
+# ─────────────────────────────────────────────
+# 5. SMOTE — applied to training set only
+# ─────────────────────────────────────────────
+print("\n⚖️  Applying SMOTE ...")
 smote = SMOTE(random_state=42)
-X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
+X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
+print(f"  {len(y_train_sm):,} samples after resampling")
 
-# 7. Define models
+# ─────────────────────────────────────────────
+# 6. Define Models
+# ─────────────────────────────────────────────
 models = {
-    "decision_tree_model.pkl": DecisionTreeClassifier(random_state=42),
-    "random_forest_model.pkl": RandomForestClassifier(random_state=42),
-    "xgboost_model.pkl":       XGBRFClassifier(random_state=42),
+    "logistic_regression": {
+        "file":  "logistic_regression_model.pkl",
+        "model": LogisticRegression(max_iter=1000, random_state=42, C=1.0),
+    },
+    "random_forest": {
+        "file":  "random_forest_model.pkl",
+        "model": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    },
+    "xgboost": {
+        "file":  "xgboost_model.pkl",
+        "model": XGBRFClassifier(n_estimators=100, random_state=42, eval_metric="logloss"),
+    },
 }
 
-if not os.path.exists('models'):
-    os.makedirs('models')
-    print("📁 Created 'models' folder.")
-
-# 8. Train, save, and evaluate each model
-print("🚀 Training models and computing real metrics...")
-
-# Map pkl filename → key used in metrics.json / views.py
-MODEL_KEYS = {
-    "decision_tree_model.pkl": "decision_tree",
-    "random_forest_model.pkl": "random_forest",
-    "xgboost_model.pkl":       "xgboost",
-}
+# ─────────────────────────────────────────────
+# 7. Train, Evaluate & Save
+# ─────────────────────────────────────────────
+print("\n🚀 Training models ...\n")
 
 metrics_output = {}
 
-for filename, model in models.items():
-    model.fit(X_train_smote, y_train_smote)
+for key, cfg in models.items():
+    print(f"  ▶ {key}")
+    clf = cfg["model"]
+    clf.fit(X_train_sm, y_train_sm)
 
-    # Save model
-    path = os.path.join('models', filename)
-    with open(path, "wb") as f:
-        pickle.dump(model, f)
-    print(f"✅ Saved: {path}")
+    y_pred  = clf.predict(X_test)
+    y_proba = clf.predict_proba(X_test)[:, 1]
 
-    # Evaluate on held-out test set (never seen during training)
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
-
-    acc  = round(accuracy_score(y_test, y_pred) * 100, 1)
-    prec = round(precision_score(y_test, y_pred, zero_division=0) * 100, 1)
-    rec  = round(recall_score(y_test, y_pred, zero_division=0) * 100, 1)
-    f1   = round(f1_score(y_test, y_pred, zero_division=0) * 100, 1)
-    auc  = round(float(roc_auc_score(y_test, y_prob)), 4)
+    acc  = round(float(accuracy_score(y_test, y_pred)) * 100, 1)
+    prec = round(float(precision_score(y_test, y_pred, zero_division=0)) * 100, 1)
+    rec  = round(float(recall_score(y_test, y_pred, zero_division=0)) * 100, 1)
+    f1   = round(float(f1_score(y_test, y_pred, zero_division=0)) * 100, 1)
+    auc  = round(float(roc_auc_score(y_test, y_proba)), 4)
 
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
 
-    # Downsample ROC curve to 6 representative points for the chart
-    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    # Downsample ROC to 6 representative points for chart rendering
+    fpr, tpr, _ = roc_curve(y_test, y_proba)
     idx = np.linspace(0, len(fpr) - 1, 6, dtype=int)
     roc_points = [[round(float(fpr[i]), 3), round(float(tpr[i]), 3)] for i in idx]
 
-    key = MODEL_KEYS[filename]
     metrics_output[key] = {
         "accuracy":  acc,
         "precision": prec,
@@ -112,20 +193,33 @@ for filename, model in models.items():
         "roc": roc_points,
     }
 
-    print(f"   {key}: acc={acc}% prec={prec}% rec={rec}% f1={f1}% auc={auc}")
+    print(f"     acc={acc}%  prec={prec}%  rec={rec}%  f1={f1}%  auc={auc}")
 
-# 9. Save metrics.json — views.py reads this instead of hardcoded values
-metrics_path = os.path.join('models', 'metrics.json')
+    path = os.path.join(MODELS_DIR, cfg["file"])
+    with open(path, "wb") as f:
+        pickle.dump(clf, f)
+
+# ─────────────────────────────────────────────
+# 8. Save Artifacts
+# ─────────────────────────────────────────────
+
+# metrics.json — consumed by ai_models_page view → models.html JS
+metrics_path = os.path.join(MODELS_DIR, "metrics.json")
 with open(metrics_path, "w") as f:
     json.dump(metrics_output, f, indent=2)
-print(f"✅ Saved: {metrics_path}")
+print(f"\n✅ Saved: {metrics_path}")
 
-# 10. Save encoders and feature names
-with open("models/encoders.pkl", "wb") as f:
+# metadata.pkl — consumed by BulkPredictionView + SinglePredictionView at inference
+metadata_path = os.path.join(MODELS_DIR, "metadata.pkl")
+with open(metadata_path, "wb") as f:
     pickle.dump({
-        "encoders": encoders,
-        "feature_names": X.columns.tolist()
+        "scaler":        scaler,
+        "numeric_cols":  num_cols,
+        "cat_cols":      cat_cols,
+        "feature_names": X_encoded.columns.tolist(),
     }, f)
-print("✅ Saved: models/encoders.pkl")
+print(f"✅ Saved: {metadata_path}")
 
-print("\n✨ Success! All models trained, evaluated, and metrics saved.")
+print("\n" + "=" * 60)
+print("✨ Done! Models trained with One-Hot + StandardScaler + SMOTE.")
+print("=" * 60)

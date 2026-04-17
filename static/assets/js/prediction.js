@@ -132,6 +132,13 @@ async function runSingleSimulation() {
             // A. Update Probability
             outcomeVal.textContent = risk + '%';
 
+            // B. Update AI Confidence (how certain the model is in its prediction, either way)
+            const confidenceEl = document.getElementById('ai-confidence');
+            if (confidenceEl) {
+                const confidence = (Math.max(prob, 1 - prob) * 100).toFixed(1);
+                confidenceEl.textContent = confidence + '%';
+            }
+
             // B. Update Financial Impact (Revenue at Risk)
             const impact = (monthlyCharges * prob).toFixed(2);
             mrrImpact.textContent = '$' + impact;

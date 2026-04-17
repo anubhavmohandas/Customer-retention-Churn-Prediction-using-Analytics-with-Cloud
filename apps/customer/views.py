@@ -164,7 +164,7 @@ class BulkPredictionView(APIView):
             # 2. Load Assets
             with open(model_path, 'rb') as f:
                 model = pickle.load(f)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'encoders.pkl'), 'rb') as f:
+            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
             # 3. Process Data
@@ -172,15 +172,25 @@ class BulkPredictionView(APIView):
             orig_df = df.copy()
 
             if 'customerID' in df.columns: df = df.drop(columns=['customerID'])
+            if 'Churn' in df.columns: df = df.drop(columns=['Churn'])
             df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce').fillna(0)
             df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors='coerce').fillna(0)
 
-            for col, le in meta["encoders"].items():
-                if col in df.columns:
-                    df[col] = df[col].map(lambda s: le.transform([s])[0] if s in le.classes_ else 0)
+            # ONE-HOT ENCODE the same categorical columns used during training
+            cat_cols = meta.get("cat_cols", [])
+            df_encoded = pd.get_dummies(
+                df, columns=[c for c in cat_cols if c in df.columns], drop_first=False
+            ).astype(float)
+
+            # Align to training feature space: add missing cols as 0, drop extra cols
+            df_encoded = df_encoded.reindex(columns=meta["feature_names"], fill_value=0)
+
+            # Apply the same StandardScaler fitted during training
+            num_cols = meta["numeric_cols"]
+            df_encoded[num_cols] = meta["scaler"].transform(df_encoded[num_cols])
 
             # 4. Predict
-            predictions = model.predict_proba(df[meta["feature_names"]])[:, 1]
+            predictions = model.predict_proba(df_encoded)[:, 1]
             avg_risk = float(predictions.mean())
             high_risk_count = int((predictions > 0.7).sum())
 
@@ -253,18 +263,26 @@ class SinglePredictionView(APIView):
 
             with open(model_path, 'rb') as f:
                 model = pickle.load(f)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'encoders.pkl'), 'rb') as f:
+            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
-            # Prepare Input
-            input_dict = {feat: 0 for feat in meta["feature_names"]}
-            input_dict['tenure'] = tenure
-            input_dict['MonthlyCharges'] = monthly_charges
-            if 'Contract' in meta["encoders"]:
-                le = meta["encoders"]['Contract']
-                input_dict['Contract'] = le.transform([contract])[0] if contract in le.classes_ else 0
+            # Build feature vector: all zeros (absent / default category), then set known inputs
+            input_dict = {col: 0.0 for col in meta["feature_names"]}
+            input_dict['tenure'] = float(tenure)
+            input_dict['MonthlyCharges'] = float(monthly_charges)
+            input_dict['TotalCharges'] = 0.0  # not provided in single prediction
 
-            df_input = pd.DataFrame([input_dict])[meta["feature_names"]]
+            # Set One-Hot contract flag (e.g. "Contract_Month-to-month")
+            contract_col = f"Contract_{contract}"
+            if contract_col in input_dict:
+                input_dict[contract_col] = 1.0
+
+            df_input = pd.DataFrame([input_dict])
+
+            # Apply StandardScaler to numeric columns
+            num_cols = meta["numeric_cols"]
+            df_input[num_cols] = meta["scaler"].transform(df_input[num_cols])
+
             prob = float(model.predict_proba(df_input)[0, 1])
 
             # 1. Save to LIVE PredictionReport
@@ -424,9 +442,9 @@ def ai_models_page(request):
             "roc": [[0,0], [1,1]]
         }
         comparison_data = {
-            "decision_tree": empty_metrics,
-            "random_forest": empty_metrics,
-            "xgboost": empty_metrics
+            "logistic_regression": empty_metrics,
+            "random_forest":       empty_metrics,
+            "xgboost":             empty_metrics,
         }
         status = "No Data"
     else:
@@ -439,13 +457,12 @@ def ai_models_page(request):
                 comparison_data = json.load(f)
         except FileNotFoundError:
             logger.warning("models/metrics.json not found — run train_models.py to generate it.")
+            _empty = {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
+                      "tn": 0, "fp": 0, "fn": 0, "tp": 0, "roc": [[0,0],[1,1]]}
             comparison_data = {
-                "decision_tree": {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
-                                  "tn": 0, "fp": 0, "fn": 0, "tp": 0, "roc": [[0,0],[1,1]]},
-                "random_forest": {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
-                                  "tn": 0, "fp": 0, "fn": 0, "tp": 0, "roc": [[0,0],[1,1]]},
-                "xgboost":       {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
-                                  "tn": 0, "fp": 0, "fn": 0, "tp": 0, "roc": [[0,0],[1,1]]},
+                "logistic_regression": _empty,
+                "random_forest":       _empty,
+                "xgboost":             _empty,
             }
 
     return render(request, 'models.html', {
