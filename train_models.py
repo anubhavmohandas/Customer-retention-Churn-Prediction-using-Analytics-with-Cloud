@@ -1,85 +1,219 @@
-import pandas as pd
-import numpy as np
-import pickle
+"""
+Telco Customer Churn — Full Pipeline
+EDA → Preprocessing → SMOTE → Model Training → Evaluation → Save Artifacts
+"""
+
 import os
-from sklearn.preprocessing import LabelEncoder
+import pickle
+import json
+import warnings
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    classification_report,
+    roc_auc_score,
+    roc_curve,
+)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from xgboost import XGBRFClassifier
 
-# 1. Load Dataset
-DATA_PATH = "dataset/TelecoCustomerChurn.csv"
+warnings.filterwarnings("ignore")
+
+# ─────────────────────────────────────────────
+# 0. Setup
+# ─────────────────────────────────────────────
+DATA_PATH  = "dataset/TelecoCustomerChurn.csv"
+MODELS_DIR = "models"
+PLOTS_DIR  = "plots"
+
+for d in [MODELS_DIR, PLOTS_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+PALETTE   = {"No": "#2ecc71", "Yes": "#e74c3c"}
+BLUE      = "#3498db"
+RED       = "#e74c3c"
+plt.rcParams.update({"figure.dpi": 120, "axes.spines.top": False,
+                     "axes.spines.right": False})
+
+# ─────────────────────────────────────────────
+# 1. Load
+# ─────────────────────────────────────────────
 if not os.path.exists(DATA_PATH):
-    print(f"❌ Error: {DATA_PATH} not found.")
-    exit()
+    raise FileNotFoundError(f"❌ Dataset not found at '{DATA_PATH}'")
 
-df = pd.read_csv(DATA_PATH)
+df_raw = pd.read_csv(DATA_PATH)
+print("=" * 60)
+print(f"✅ Loaded dataset: {df_raw.shape[0]:,} rows × {df_raw.shape[1]} columns")
+print("=" * 60)
 
-# 2. Data Cleaning
-df = df.drop(columns=["customerID"])
+# ─────────────────────────────────────────────
+# 2. Cleaning
+# ─────────────────────────────────────────────
+df = df_raw.copy()
+df.drop(columns=["customerID"], inplace=True)
+df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+df.dropna(subset=["TotalCharges"], inplace=True)
+df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0}).astype(int)
+df.reset_index(drop=True, inplace=True)
 
-# Fix TotalCharges (Handling the " " strings)
-df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce').fillna(0)
+print(f"\n✅ After cleaning: {df.shape[0]:,} rows × {df.shape[1]} columns")
 
-# 3. Categorical Encoding
-object_columns = df.select_dtypes(include=["object", "string"]).columns
-encoders = {}
+# ─────────────────────────────────────────────
+# 3. EDA Plots
+# ─────────────────────────────────────────────
+print("\n📊 Generating EDA plots ...")
 
-for column in object_columns:
-    if column != "Churn":
-        le = LabelEncoder()
-        df[column] = le.fit_transform(df[column])
-        encoders[column] = le
+churn_labels = df_raw["Churn"].value_counts()
 
-# --- BUG FIX START: Strict Target Formatting ---
-# Convert Churn to 1/0 and force it to be an Integer
-df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0})
+# 3-A: Churn distribution
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].bar(churn_labels.index, churn_labels.values,
+            color=[PALETTE["No"], PALETTE["Yes"]], edgecolor="white", width=0.5)
+axes[0].set_title("Churn Count", fontweight="bold")
+axes[0].set_ylabel("Customers")
+for i, v in enumerate(churn_labels.values):
+    axes[0].text(i, v + 30, f"{v:,}", ha="center", fontsize=10)
 
-# Drop any rows that failed to map (prevents 'unknown' label error)
-df = df.dropna(subset=["Churn"])
+pct = churn_labels / churn_labels.sum() * 100
+axes[1].pie(pct.values, labels=pct.index, autopct="%1.1f%%",
+            colors=[PALETTE["No"], PALETTE["Yes"]],
+            startangle=90, wedgeprops=dict(edgecolor="white"))
+axes[1].set_title("Churn Share", fontweight="bold")
+plt.suptitle("Target Variable — Churn", fontsize=13, fontweight="bold", y=1.01)
+plt.tight_layout()
+plt.savefig(f"{PLOTS_DIR}/01_churn_distribution.png", bbox_inches="tight")
+plt.close()
 
-# Explicitly cast to int64
-df["Churn"] = df["Churn"].astype(np.int64)
-# --- BUG FIX END ---
+# 3-B: Correlation heatmap (For Plotting Only)
+df_corr = df.copy()
+obj_cols = df_corr.select_dtypes(include=["object", "string"]).columns
+for c in obj_cols:
+    df_corr[c] = LabelEncoder().fit_transform(df_corr[c].astype(str))
+corr = df_corr.corr()
 
-# 4. Split Data
+fig, ax = plt.subplots(figsize=(16, 13))
+mask = np.triu(np.ones_like(corr, dtype=bool))
+sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap="coolwarm",
+            linewidths=0.5, vmin=-1, vmax=1, ax=ax, annot_kws={"size": 7})
+ax.set_title("Feature Correlation Heatmap", fontsize=14, fontweight="bold")
+plt.tight_layout()
+plt.savefig(f"{PLOTS_DIR}/04_correlation_heatmap.png", bbox_inches="tight")
+plt.close()
+print(f"  ✅ Saved visual plots to {PLOTS_DIR}/")
+
+# ─────────────────────────────────────────────
+# 4. Preprocessing (Upgraded for Django Integration)
+# ─────────────────────────────────────────────
+print("\n🔧 Preprocessing Data ...")
+
 X = df.drop(columns=["Churn"])
 y = df["Churn"]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# ONE-HOT ENCODING (Crucial for Logistic Regression)
+cat_cols = X.select_dtypes(include=["object", "string"]).columns
+X_encoded = pd.get_dummies(X, columns=cat_cols, drop_first=False)
+X_encoded = X_encoded.astype(float)
 
-# 5. SMOTE (Should now work without the ValueError)
-print("⚖️ Applying SMOTE to balance classes...")
+X_train, X_test, y_train, y_test = train_test_split(
+    X_encoded, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# SCALING (Crucial for total_charges vs tenure)
+num_cols = ["tenure", "MonthlyCharges", "TotalCharges"]
+scaler = StandardScaler()
+X_train[num_cols] = scaler.fit_transform(X_train[num_cols])
+X_test[num_cols] = scaler.transform(X_test[num_cols])
+
+print(f"  Train: {X_train.shape[0]:,} | Test: {X_test.shape[0]:,}")
+
+# ─────────────────────────────────────────────
+# 5. SMOTE
+# ─────────────────────────────────────────────
+print("\n⚖️  Applying SMOTE ...")
 smote = SMOTE(random_state=42)
-X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
+X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
 
-# 6. Define and Train the 3 Models
+# ─────────────────────────────────────────────
+# 6. Define Models
+# ─────────────────────────────────────────────
 models = {
-    "decision_tree_model.pkl": DecisionTreeClassifier(random_state=42),
-    "random_forest_model.pkl": RandomForestClassifier(random_state=42),
-    "xgboost_model.pkl": XGBRFClassifier(random_state=42)
+    "Logistic Regression": {
+        "file": "logistic_regression_model.pkl",
+        "model": LogisticRegression(max_iter=1000, random_state=42, C=1.0),
+    },
+    "Random Forest": {
+        "file": "random_forest_model.pkl",
+        "model": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    },
+    "XGBoost": {
+        "file": "xgboost_model.pkl",
+        "model": XGBRFClassifier(n_estimators=100, random_state=42, eval_metric="logloss"),
+    },
 }
 
-if not os.path.exists('models'):
-    os.makedirs('models')
-    print("📁 Created 'models' folder.")
+# ─────────────────────────────────────────────
+# 7. Train, Evaluate & Save
+# ─────────────────────────────────────────────
+print("\n🚀 Training models ...\n")
 
-print("🚀 Training 3 separate models...")
-for filename, model in models.items():
-    model.fit(X_train_smote, y_train_smote)
-    path = os.path.join('models', filename)
+results = {}
+roc_data = {}
+json_metrics = {}
+COLORS_ROC = [BLUE, "#9b59b6", RED]
+
+for name, cfg in models.items():
+    print(f"  ▶ {name}")
+    clf = cfg["model"]
+    clf.fit(X_train_sm, y_train_sm)
+
+    y_pred    = clf.predict(X_test)
+    y_proba   = clf.predict_proba(X_test)[:, 1]
+    auc       = roc_auc_score(y_test, y_proba)
+    report    = classification_report(y_test, y_pred, output_dict=True)
+    fpr, tpr, _ = roc_curve(y_test, y_proba)
+
+    results[name]  = {"report": report, "auc": auc, "y_pred": y_pred}
+    roc_data[name] = (fpr, tpr, auc)
+
+    # Compile JSON data for Django Dashboard
+    json_name = name.lower().replace(" ", "_")
+    json_metrics[json_name] = {
+        "accuracy": round((report["accuracy"]) * 100, 1),
+        "precision": round(report["1"]["precision"] * 100, 1),
+        "recall": round(report["1"]["recall"] * 100, 1),
+        "f1": round(report["1"]["f1-score"] * 100, 1),
+    }
+
+    # Save model .pkl file
+    path = os.path.join(MODELS_DIR, cfg["file"])
     with open(path, "wb") as f:
-        pickle.dump(model, f)
-    print(f"✅ Saved: {path}")
+        pickle.dump(clf, f)
 
-# 7. Save Encoders and Feature Names for Django
-with open("models/encoders.pkl", "wb") as f:
+# Save JSON file for Dashboard
+with open(os.path.join(MODELS_DIR, "metrics.json"), "w") as f:
+    json.dump(json_metrics, f)
+print(f"\n    ✅ Saved API Metrics → {MODELS_DIR}/metrics.json")
+
+# ─────────────────────────────────────────────
+# 8. Save Django Metadata Artifacts
+# ─────────────────────────────────────────────
+with open(os.path.join(MODELS_DIR, "metadata.pkl"), "wb") as f:
     pickle.dump({
-        "encoders": encoders,
-        "feature_names": X.columns.tolist()
+        "scaler": scaler,
+        "numeric_cols": num_cols,
+        "feature_names": X_train.columns.tolist()
     }, f)
-print("✅ Saved: models/encoders.pkl")
+print(f"    ✅ Saved API Metadata → {MODELS_DIR}/metadata.pkl")
 
-print("\n✨ Success! All models trained and saved properly.")
+print("\n" + "=" * 60)
+print("✨ Done! Models and APIs are fully compiled.")
+print("=" * 60)

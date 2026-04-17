@@ -63,7 +63,7 @@
 
                 <div>
                   <label class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-4">Contract Type</label>
-                  <select id="select-contract" onchange="runSingleSimulation()" class="w-full bg-gray-50 dark:bg-zinc-800 dark:text-white p-4 curved font-bold outline-none border border-gray-100 dark:border-zinc-700 cursor-pointer focus:border-black dark:focus:border-white transition-all">
+                  <select id="select-contract" onchange="runSingleSimulation(false)" class="w-full bg-gray-50 dark:bg-zinc-800 dark:text-white p-4 curved font-bold outline-none border border-gray-100 dark:border-zinc-700 cursor-pointer focus:border-black dark:focus:border-white transition-all">
                     <option value="Month-to-month">Month-to-month</option>
                     <option value="One year">One year</option>
                     <option value="Two year">Two year</option>
@@ -72,16 +72,18 @@
 
                 <div>
                   <label class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-4">AI Model Version</label>
-                  <select id="model-select-single" onchange="runSingleSimulation()" class="w-full bg-gray-50 dark:bg-zinc-800 dark:text-white p-4 curved font-bold outline-none border border-gray-100 dark:border-zinc-700 cursor-pointer">
+                  <select id="model-select-single" onchange="runSingleSimulation(false)" class="w-full bg-gray-50 dark:bg-zinc-800 dark:text-white p-4 curved font-bold outline-none border border-gray-100 dark:border-zinc-700 cursor-pointer">
                     <option value="random_forest">Random Forest Core (V1)</option>
                     <option value="xgboost">XGBoost Pro (V2.1)</option>
-                    <option value="ensemble">Ensemble Stack (V3.0)</option>
+                    <option value="logistic_regression">Logistic Regression (V1.2)</option>
+                    <option value="ensemble_stack">Ensemble Stack (V3.0 - Hybrid)</option>
                   </select>
                 </div>
             </div>
 
-            <button onclick="runSingleSimulation()" class="w-full bg-black dark:bg-white dark:text-black text-white py-5 curved font-extrabold text-[10px] tracking-[0.2em] uppercase hover:scale-[0.98] transition-all active:scale-95 mt-8 shadow-xl shadow-black/10">
-              Run ML Prediction
+            <button onclick="runSingleSimulation(true)" id="run-single-btn" class="w-full bg-black dark:bg-white dark:text-black text-white py-5 curved font-extrabold text-[10px] tracking-[0.2em] uppercase hover:scale-[0.98] transition-all active:scale-95 mt-8 shadow-xl shadow-black/10 flex justify-center items-center gap-2">
+              <span id="single-btn-text">Run ML Prediction</span>
+              <div id="single-spinner" class="spinner hidden w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
             </button>
           </div>
 
@@ -126,7 +128,6 @@
         </div>
 
         <div id="outcome-area" class="bg-gray-50 dark:bg-zinc-900/50 p-8 md:p-10 curved border border-dashed border-gray-200 dark:border-zinc-800 flex flex-col min-h-[500px] transition-all duration-500">
-
           <div id="single-outcome-view" class="flex flex-col h-full animate-fade-in">
             <div class="text-center mb-10">
               <p class="text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-4">Churn Risk Probability</p>
@@ -141,7 +142,7 @@
                 </div>
                 <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-sm">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">AI Confidence</p>
-                    <p class="text-3xl font-black dark:text-white tracking-tight">94.2%</p>
+                    <p class="text-3xl font-black dark:text-white tracking-tight" id="ai-confidence">--%</p>
                 </div>
             </div>
 
@@ -151,13 +152,13 @@
                     <div class="space-y-2">
                         <div class="flex justify-between text-xs font-bold"><span class="dark:text-zinc-300">Contract Structure</span><span class="text-red-500">Major</span></div>
                         <div class="w-full bg-gray-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-red-500 h-full w-[88%]"></div>
+                            <div id="factor-contract-bar" class="bg-red-500 h-full w-[0%] transition-all duration-500"></div>
                         </div>
                     </div>
                     <div class="space-y-2">
                         <div class="flex justify-between text-xs font-bold"><span class="dark:text-zinc-300">Account Maturity</span><span class="text-yellow-500">Moderate</span></div>
                         <div class="w-full bg-gray-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-yellow-500 h-full w-[42%]"></div>
+                            <div id="factor-tenure-bar" class="bg-yellow-500 h-full w-[0%] transition-all duration-500"></div>
                         </div>
                     </div>
                 </div>

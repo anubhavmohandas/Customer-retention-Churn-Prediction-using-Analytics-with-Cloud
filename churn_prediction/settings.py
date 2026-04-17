@@ -54,7 +54,12 @@ AUTH_USER_MODEL = 'customer.Customer'
 # Apps / middleware
 # ---------------------------------------------------------------------------
 INSTALLED_APPS = [
-    'jazzmin',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'admin_interface',
+    'colorfield',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -64,9 +69,14 @@ INSTALLED_APPS = [
     'apps.customer',
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    # WhiteNoise serves static files in production without nginx doing it.
+    # WhiteNoise serves static files in production
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -74,7 +84,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # Add this line here
+    'allauth.account.middleware.AccountMiddleware',
 ]
+
 
 ROOT_URLCONF = 'churn_prediction.urls'
 
@@ -94,6 +108,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'churn_prediction.wsgi.application'
+
+
+AUTH_USER_MODEL = 'customer.Customer'
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
 
 # ---------------------------------------------------------------------------
 # Database
@@ -143,6 +164,13 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = os.environ.get('DJANGO_TIME_ZONE', 'UTC')
 USE_I18N = True
 USE_TZ = True
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
@@ -203,3 +231,9 @@ LOGGING = {
         'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
     },
 }
+
+# Temporary debug lines
+print("--- ENV CHECK ---")
+print(f"DEBUG IS: {DEBUG}")
+print(f"DATABASE: {DATABASES['default']['ENGINE']}")
+print("-----------------")

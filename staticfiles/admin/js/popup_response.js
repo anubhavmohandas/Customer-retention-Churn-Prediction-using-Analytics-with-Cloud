@@ -11,6 +11,10 @@
         openerRef = windowRef.parent;
         windowName = windowRef.name;
         widgetName = windowName.replace(/^(change|add|delete|lookup)_/, '');
+        if (typeof(openerRef.id_to_windowname) === 'function') {
+            // django < 3.1 compatibility
+            widgetName = openerRef.id_to_windowname(widgetName);
+        }
         windowRefProxy = {
             name: widgetName,
             location: windowRef.location,

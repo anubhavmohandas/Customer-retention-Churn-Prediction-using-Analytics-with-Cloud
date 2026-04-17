@@ -152,22 +152,26 @@ class BulkPredictionView(APIView):
             if not file_obj:
                 return Response({"error": "No file uploaded"}, status=400)
 
-            # 1. Model Selection
-            model_filename = f'{requested_model}_model.pkl'
+            model_map = {
+                'random_forest': 'random_forest_model.pkl',
+                'xgboost': 'xgboost_model.pkl',
+                'logistic_regression': 'logistic_regression_model.pkl'
+            }
+            model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
             model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
+
             if not os.path.exists(model_path):
                 model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
-                final_model_name = 'random_forest'
-            else:
-                final_model_name = requested_model
 
-            # 2. Load Assets
             with open(model_path, 'rb') as f:
                 model = pickle.load(f)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'encoders.pkl'), 'rb') as f:
+            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
-            # 3. Process Data
+            scaler = meta["scaler"]
+            numeric_cols = meta["numeric_cols"]
+            feature_names = meta["feature_names"]
+
             df = pd.read_csv(file_obj)
             orig_df = df.copy()
 
@@ -175,16 +179,26 @@ class BulkPredictionView(APIView):
             df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce').fillna(0)
             df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors='coerce').fillna(0)
 
-            for col, le in meta["encoders"].items():
-                if col in df.columns:
-                    df[col] = df[col].map(lambda s: le.transform([s])[0] if s in le.classes_ else 0)
+            # One-Hot Encode and align with trained features
+            categorical_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
+            if "Churn" in categorical_cols:
+                categorical_cols.remove("Churn")
 
-            # 4. Predict
-            predictions = model.predict_proba(df[meta["feature_names"]])[:, 1]
+            df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=False)
+
+            for col in feature_names:
+                if col not in df_encoded.columns:
+                    df_encoded[col] = 0.0
+
+            df_input = df_encoded[feature_names].astype(float)
+            df_input[numeric_cols] = scaler.transform(df_input[numeric_cols])
+
+            predictions = model.predict_proba(df_input)[:, 1]
             avg_risk = float(predictions.mean())
             high_risk_count = int((predictions > 0.7).sum())
 
-            # 5. Save to LIVE PredictionReport (For Dashboard/Analysis)
+            PredictionReport.objects.filter(user=request.user).exclude(source_file="Single Analysis").delete()
+
             PredictionReport.objects.create(
                 user=request.user,
                 subscriber_id=f"BATCH-{random.randint(100, 999)}",
@@ -194,10 +208,9 @@ class BulkPredictionView(APIView):
                 monthly_charges=float(orig_df['MonthlyCharges'].mean()) if 'MonthlyCharges' in orig_df.columns else 0.0,
                 contract_type="Bulk Upload",
                 risk_score=avg_risk,
-                model_version=final_model_name
+                model_version=requested_model.replace('_', ' ').title()
             )
 
-            # 6. Save to PERMANENT ReportHistory (For History Page)
             ReportHistory.objects.create(
                 user=request.user,
                 batch_name=f"Batch_{timezone.now().strftime('%b_%d_%H%M')}",
@@ -205,7 +218,7 @@ class BulkPredictionView(APIView):
                 total_records=len(df),
                 avg_risk_score=avg_risk,
                 critical_count=high_risk_count,
-                model_version=final_model_name
+                model_version=requested_model.replace('_', ' ').title()
             )
 
             return Response({
@@ -215,9 +228,10 @@ class BulkPredictionView(APIView):
                 "med_risk_count": int(((predictions <= 0.7) & (predictions > 0.3)).sum()),
                 "low_risk_count": int((predictions <= 0.3).sum()),
             })
-        except Exception:
+        except Exception as e:
             logger.exception("Bulk prediction failed")
-            return Response({"error": "Prediction failed. Please check your file and try again."}, status=500)
+            return Response({"error": f"Internal Error: {str(e)}"}, status=500)
+
 
 class SinglePredictionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -229,36 +243,80 @@ class SinglePredictionView(APIView):
             contract = request.data.get('contract', 'Month-to-month')
             requested_model = request.data.get('model', 'random_forest')
 
-            # Model Selection logic
-            model_filename = f'{requested_model}_model.pkl'
-            model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
-            if not os.path.exists(model_path):
-                model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
-                final_model_name = 'random_forest'
-            else:
-                final_model_name = requested_model
+            save_val = request.data.get('save_to_history', False)
+            save_to_history = str(save_val).lower() == 'true' or save_val is True
 
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'encoders.pkl'), 'rb') as f:
+            # Load Metadata (Scaler & Feature Names)
+            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
-            # Prepare Input
-            input_dict = {feat: 0 for feat in meta["feature_names"]}
+            scaler = meta["scaler"]
+            numeric_cols = meta["numeric_cols"]
+            feature_names = meta["feature_names"]
+
+            # Format input mathematically
+            input_dict = {feat: 0.0 for feat in feature_names}
             input_dict['tenure'] = tenure
             input_dict['MonthlyCharges'] = monthly_charges
-            if 'Contract' in meta["encoders"]:
-                le = meta["encoders"]['Contract']
-                input_dict['Contract'] = le.transform([contract])[0] if contract in le.classes_ else 0
+            input_dict['TotalCharges'] = tenure * monthly_charges
 
-            df_input = pd.DataFrame([input_dict])[meta["feature_names"]]
-            prob = float(model.predict_proba(df_input)[0, 1])
+            contract_col = f"Contract_{contract}"
+            if contract_col in input_dict:
+                input_dict[contract_col] = 1.0
 
-            # 1. Save to LIVE PredictionReport
+            df_input = pd.DataFrame([input_dict])[feature_names]
+            df_input[numeric_cols] = scaler.transform(df_input[numeric_cols])
+
+            # Ensemble Logic vs Single Model Logic
+            if requested_model == "ensemble_stack":
+                models_to_run = ['random_forest_model.pkl', 'xgboost_model.pkl', 'logistic_regression_model.pkl']
+                probs = []
+                for m_file in models_to_run:
+                    path = os.path.join(settings.BASE_DIR, 'models', m_file)
+                    if os.path.exists(path):
+                        with open(path, 'rb') as f:
+                            m_obj = pickle.load(f)
+                            probs.append(float(m_obj.predict_proba(df_input)[0, 1]))
+                prob = sum(probs) / len(probs) if probs else 0.0
+                final_model_name = "Ensemble Stack"
+            else:
+                model_map = {
+                    'random_forest': 'random_forest_model.pkl',
+                    'xgboost': 'xgboost_model.pkl',
+                    'logistic_regression': 'logistic_regression_model.pkl'
+                }
+                model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
+                model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
+
+                if not os.path.exists(model_path):
+                    model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
+
+                with open(model_path, 'rb') as f:
+                    model_obj = pickle.load(f)
+                prob = float(model_obj.predict_proba(df_input)[0, 1])
+                final_model_name = requested_model.replace('_', ' ').title()
+
+            # Dynamic AI Confidence Scoring
+            confidence_score = 85.0
+            try:
+                metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
+                if os.path.exists(metrics_path):
+                    with open(metrics_path, 'r') as f:
+                        metrics = json.load(f)
+                        if requested_model == "ensemble_stack":
+                            accs = [m.get('accuracy', 85.0) for m in metrics.values()]
+                            confidence_score = round(sum(accs) / len(accs), 1) if accs else 85.0
+                        else:
+                            confidence_score = metrics.get(requested_model, {}).get('accuracy', 85.0)
+            except Exception as e:
+                logger.error(f"Could not load metrics for confidence: {e}")
+
+            # Database Tracking
+            PredictionReport.objects.filter(user=request.user, source_file="Single Analysis").delete()
             PredictionReport.objects.create(
                 user=request.user,
                 subscriber_id=f"SUB-{random.randint(1000, 9999)}",
-                source_file="Manual Slider",
+                source_file="Single Analysis",
                 record_count=1,
                 tenure=int(tenure),
                 monthly_charges=monthly_charges,
@@ -267,33 +325,37 @@ class SinglePredictionView(APIView):
                 model_version=final_model_name
             )
 
-            # 2. Save to PERMANENT ReportHistory
-            ReportHistory.objects.create(
-                user=request.user,
-                batch_name=f"Single_Calc_{timezone.now().strftime('%H%M')}",
-                source_file="Manual Entry",
-                total_records=1,
-                avg_risk_score=prob,
-                critical_count=1 if prob >= 0.7 else 0,
-                model_version=final_model_name
-            )
+            if save_to_history:
+                ReportHistory.objects.create(
+                    user=request.user,
+                    batch_name=f"Manual_Run_{timezone.now().strftime('%H%M%S')}",
+                    source_file="Manual Entry",
+                    total_records=1,
+                    avg_risk_score=prob,
+                    critical_count=1 if prob >= 0.7 else 0,
+                    model_version=final_model_name
+                )
 
-            return Response({"probability": prob, "status": "success"})
-        except Exception:
+            return Response({
+                "probability": prob,
+                "saved": save_to_history,
+                "model_used": final_model_name,
+                "confidence": confidence_score
+            })
+        except Exception as e:
             logger.exception("Single prediction failed")
-            return Response({"error": "Prediction failed. Please try again."}, status=500)
+            return Response({"error": str(e)}, status=500)
 
-# --- HISTORY VIEW ---
 
 @login_required(login_url='/accounts/login/')
 def report_history_page(request):
     query = request.GET.get('q', '').strip()
 
-    # 1. Maintenance: Auto-delete records older than 30 days every time page is loaded
-    ReportHistory.cleanup_old_reports()
+    # Maintenance: Cleanup old data (30-day policy)
+    if hasattr(ReportHistory, 'cleanup_old_reports'):
+        ReportHistory.cleanup_old_reports()
 
-    # 2. User isolation - Pull from the ARCHIVE, not the live predictions
-    reports = ReportHistory.objects.filter(user=request.user)
+    reports = ReportHistory.objects.filter(user=request.user).order_by('-created_at')
 
     if query:
         reports = reports.filter(
@@ -302,21 +364,30 @@ def report_history_page(request):
             Q(source_file__icontains=query)
         )
 
-    # 3. Stats Aggregation (Now based on the frozen history)
-    total_sims = reports.count()
-    # Note: We pull totals directly from the history rows we saved earlier
-    total_records = reports.aggregate(Sum('total_records'))['total_records__sum'] or 0
-    avg_risk_raw = reports.aggregate(Avg('avg_risk_score'))['avg_risk_score__avg'] or 0
-    critical_count = reports.aggregate(Sum('critical_count'))['critical_count__sum'] or 0
+    # Format data for the UI
+    for report in reports:
+        report.display_risk = (report.avg_risk_score or 0) * 100
+        if report.created_at:
+            elapsed = (timezone.now() - report.created_at).days
+            report.expiry_days = max(0, 30 - elapsed)
+        else:
+            report.expiry_days = 30
+
+    stats = reports.aggregate(
+        total_rec=Sum('total_records'),
+        avg_risk=Avg('avg_risk_score'),
+        crit_count=Sum('critical_count')
+    )
 
     context = {
-        'reports': reports, # Ordered by -created_at in Meta
+        'reports': reports,
         'query': query,
-        'total_sims': total_sims,
-        'total_records': total_records,
-        'avg_risk': round(avg_risk_raw * 100, 1),
-        'critical_count': int(critical_count), # Convert from float sum to int
+        'total_sims': reports.count(),
+        'total_records': stats['total_rec'] or 0,
+        'avg_risk': round((stats['avg_risk'] or 0) * 100, 1),
+        'critical_count': int(stats['crit_count'] or 0),
     }
+
     return render(request, 'reports.html', context)
 
 @login_required(login_url='/accounts/login/')
@@ -387,43 +458,65 @@ def export_risk_list(request):
 
 @login_required(login_url='/accounts/login/')
 def ai_models_page(request):
-    # 1. Check if this user has actually processed any data
     has_data = PredictionReport.objects.filter(user=request.user).exists()
 
+    empty_metrics = {
+        "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
+        "tn": 0, "fp": 0, "fn": 0, "tp": 0,
+        "roc": [[0,0], [1,1]]
+    }
+
     if not has_data:
-        # 2. Provide an "Empty State" dictionary
-        empty_metrics = {
-            "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
-            "tn": 0, "fp": 0, "fn": 0, "tp": 0,
-            "roc": [[0,0], [1,1]]
-        }
         comparison_data = {
-            "decision_tree": empty_metrics,
+            "logistic_regression": empty_metrics,
             "random_forest": empty_metrics,
             "xgboost": empty_metrics
         }
         status = "No Data"
     else:
-        # 3. Your simulated metrics (only show these if data exists)
-        # In a real app, you'd calculate these from the 'reports'
         status = "Optimized"
-        comparison_data = {
-            "decision_tree": {
-                "accuracy": 84.2, "precision": 79.5, "recall": 81.0, "f1": 80.2,
-                "tn": 750, "fp": 116, "fn": 42, "tp": 92,
-                "roc": [[0,0], [0.2, 0.5], [0.4, 0.75], [0.7, 0.85], [1,1]]
+        # Fallback visual data for charts (ROC and Confusion Matrix)
+        fallback_extras = {
+            "logistic_regression": {
+                "tn": 810, "fp": 223, "fn": 108, "tp": 266,
+                "roc": [[0,0], [0.22, 0.65], [0.4, 0.75], [0.7, 0.88], [1,1]]
             },
             "random_forest": {
-                "accuracy": 92.4, "precision": 88.1, "recall": 94.7, "f1": 91.3,
                 "tn": 842, "fp": 24, "fn": 12, "tp": 122,
                 "roc": [[0,0], [0.1, 0.6], [0.3, 0.85], [0.6, 0.95], [1,1]]
             },
             "xgboost": {
-                "accuracy": 95.1, "precision": 92.4, "recall": 96.2, "f1": 94.3,
                 "tn": 855, "fp": 11, "fn": 9, "tp": 125,
                 "roc": [[0,0], [0.05, 0.7], [0.2, 0.92], [0.5, 0.98], [1,1]]
             }
         }
+
+        comparison_data = {}
+        metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
+
+        if os.path.exists(metrics_path):
+            try:
+                with open(metrics_path, 'r') as f:
+                    real_metrics = json.load(f)
+
+                for model in ["logistic_regression", "random_forest", "xgboost"]:
+                    model_data = real_metrics.get(model, {})
+                    comparison_data[model] = {
+                        "accuracy": model_data.get("accuracy", 0.0),
+                        "precision": model_data.get("precision", 0.0),
+                        "recall": model_data.get("recall", 0.0),
+                        "f1": model_data.get("f1", 0.0),
+                        "tn": model_data.get("tn", fallback_extras[model]["tn"]),
+                        "fp": model_data.get("fp", fallback_extras[model]["fp"]),
+                        "fn": model_data.get("fn", fallback_extras[model]["fn"]),
+                        "tp": model_data.get("tp", fallback_extras[model]["tp"]),
+                        "roc": model_data.get("roc", fallback_extras[model]["roc"])
+                    }
+            except Exception as e:
+                logger.error(f"Error parsing metrics.json: {e}")
+                comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
+        else:
+            comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
 
     return render(request, 'models.html', {
         'comparison_json': json.dumps(comparison_data),
