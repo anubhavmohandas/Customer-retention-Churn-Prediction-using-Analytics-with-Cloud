@@ -92,6 +92,36 @@ class LoginHistory(models.Model):
         return f"{self.user.email} — {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
 
 
+class ActivityLog(models.Model):
+    ACTION_CHOICES = [
+        ('LOGIN_FAILED',  'Failed Login Attempt'),
+        ('LOGOUT',        'Logout'),
+        ('BULK_PREDICT',  'Bulk Prediction Run'),
+        ('CSV_EXPORT',    'CSV Export / Download'),
+    ]
+
+    # Nullable — failed logins have no authenticated user
+    user = models.ForeignKey(
+        Customer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='activity_log'
+    )
+    timestamp  = models.DateTimeField(auto_now_add=True)
+    action     = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    detail     = models.CharField(max_length=500, blank=True)
+    # For failed logins: store the attempted email so admin can still see it
+    attempted_email = models.EmailField(blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Activity Log'
+        verbose_name_plural = 'Activity Log'
+
+    def __str__(self):
+        who = self.user.email if self.user else (self.attempted_email or 'Unknown')
+        return f"{who} — {self.get_action_display()} — {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+
+
 class ReportHistory(models.Model):
     user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='history_archives')
 

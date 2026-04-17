@@ -208,6 +208,19 @@ class BulkPredictionView(APIView):
                 model_version=final_model_name
             )
 
+            # Log the bulk prediction run for audit trail
+            try:
+                from apps.customer.models import ActivityLog
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action='BULK_PREDICT',
+                    ip_address=request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+                                or request.META.get('REMOTE_ADDR'),
+                    detail=f"{len(predictions)} records processed from '{file_obj.name}' using {final_model_name}",
+                )
+            except Exception:
+                logger.exception("Failed to log bulk prediction activity")
+
             return Response({
                 "avg_risk": round(avg_risk * 100, 2),
                 "total_processed": len(predictions),
@@ -381,6 +394,19 @@ def export_risk_list(request):
             f"{report.risk_percent}%",
             report.model_version
         ])
+
+    # Log the CSV export for audit trail
+    try:
+        from apps.customer.models import ActivityLog
+        ActivityLog.objects.create(
+            user=request.user,
+            action='CSV_EXPORT',
+            ip_address=request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+                        or request.META.get('REMOTE_ADDR'),
+            detail=f"{critical_reports.count()} critical-risk records exported as critical_risk_list.csv",
+        )
+    except Exception:
+        logger.exception("Failed to log CSV export activity")
 
     return response
 
