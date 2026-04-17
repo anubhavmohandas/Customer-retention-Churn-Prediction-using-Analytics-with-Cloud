@@ -54,7 +54,8 @@ AUTH_USER_MODEL = 'customer.Customer'
 # Apps / middleware
 # ---------------------------------------------------------------------------
 INSTALLED_APPS = [
-    'jazzmin',
+    'colorfield',
+    'admin_interface',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

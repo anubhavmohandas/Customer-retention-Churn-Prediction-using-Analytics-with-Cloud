@@ -1,7 +1,8 @@
 # --- Web framework (kept at your pinned versions) ---
 asgiref==3.11.1
 Django==6.0.3
-django-jazzmin==3.0.4
+django-admin-interface==0.32.2
+django-colorfield==0.11.0
 djangorestframework==3.17.1
 sqlparse==0.5.5
 

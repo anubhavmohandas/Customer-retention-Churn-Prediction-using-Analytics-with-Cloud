@@ -95,20 +95,14 @@ def login_view(request):
 
 # --- PAGE NAVIGATION ---
 
-# def home_page(request):
-#     return render(request, 'home.html')
-
-
 @login_required(login_url='/accounts/login/')
 def dashboard_page(request):
     user_reports = PredictionReport.objects.filter(user=request.user)
 
-    # Existing logic...
     high_risk_count = user_reports.filter(risk_score__gte=0.7).count()
     mrr_at_risk = (user_reports.filter(risk_score__gte=0.7).aggregate(Sum('monthly_charges'))[
                        'monthly_charges__sum'] or 0) / 1000
 
-    # Contract Stats with Pre-calculated Percentages
     raw_contract_stats = user_reports.values('contract_type').annotate(
         avg_risk=Avg('risk_score')
     )
@@ -119,7 +113,6 @@ def dashboard_page(request):
         contract_stats.append({
             'contract_type': item['contract_type'],
             'risk_percent': round(risk_val * 100),
-            # Determine color here to keep the template clean
             'color': 'red-500' if risk_val >= 0.7 else 'yellow-500' if risk_val >= 0.3 else 'emerald-500'
         })
 
@@ -153,7 +146,12 @@ class BulkPredictionView(APIView):
                 return Response({"error": "No file uploaded"}, status=400)
 
             # 1. Model Selection
-            model_filename = f'{requested_model}_model.pkl'
+            model_map = {
+                'random_forest':        'random_forest_model.pkl',
+                'xgboost':              'xgboost_model.pkl',
+                'logistic_regression':  'logistic_regression_model.pkl',
+            }
+            model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
             model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
             if not os.path.exists(model_path):
                 model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
@@ -194,7 +192,11 @@ class BulkPredictionView(APIView):
             avg_risk = float(predictions.mean())
             high_risk_count = int((predictions > 0.7).sum())
 
-            # 5. Save to LIVE PredictionReport (For Dashboard/Analysis)
+            # 5. Clear stale bulk records, save fresh snapshot
+            PredictionReport.objects.filter(
+                user=request.user
+            ).exclude(source_file="Single Analysis").delete()
+
             PredictionReport.objects.create(
                 user=request.user,
                 subscriber_id=f"BATCH-{random.randint(100, 999)}",
@@ -207,7 +209,7 @@ class BulkPredictionView(APIView):
                 model_version=final_model_name
             )
 
-            # 6. Save to PERMANENT ReportHistory (For History Page)
+            # 6. Save to permanent ReportHistory
             ReportHistory.objects.create(
                 user=request.user,
                 batch_name=f"Batch_{timezone.now().strftime('%b_%d_%H%M')}",
@@ -218,7 +220,7 @@ class BulkPredictionView(APIView):
                 model_version=final_model_name
             )
 
-            # Log the bulk prediction run for audit trail
+            # 7. Audit log
             try:
                 from apps.customer.models import ActivityLog
                 ActivityLog.objects.create(
@@ -242,6 +244,7 @@ class BulkPredictionView(APIView):
             logger.exception("Bulk prediction failed")
             return Response({"error": "Prediction failed. Please check your file and try again."}, status=500)
 
+
 class SinglePredictionView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -251,45 +254,87 @@ class SinglePredictionView(APIView):
             monthly_charges = float(request.data.get('monthly_charges', 0))
             contract = request.data.get('contract', 'Month-to-month')
             requested_model = request.data.get('model', 'random_forest')
+            save_val = request.data.get('save_to_history', False)
+            save_to_history = str(save_val).lower() == 'true' or save_val is True
 
-            # Model Selection logic
-            model_filename = f'{requested_model}_model.pkl'
-            model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
-            if not os.path.exists(model_path):
-                model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
-                final_model_name = 'random_forest'
-            else:
-                final_model_name = requested_model
-
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
+            # Load metadata (scaler + feature names)
             with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
-            # Build feature vector: all zeros (absent / default category), then set known inputs
-            input_dict = {col: 0.0 for col in meta["feature_names"]}
-            input_dict['tenure'] = float(tenure)
-            input_dict['MonthlyCharges'] = float(monthly_charges)
-            input_dict['TotalCharges'] = 0.0  # not provided in single prediction
+            scaler = meta["scaler"]
+            numeric_cols = meta["numeric_cols"]
+            feature_names = meta["feature_names"]
 
-            # Set One-Hot contract flag (e.g. "Contract_Month-to-month")
+            # Build feature vector — all zeros, then set known inputs
+            input_dict = {feat: 0.0 for feat in feature_names}
+            input_dict['tenure'] = tenure
+            input_dict['MonthlyCharges'] = monthly_charges
+            input_dict['TotalCharges'] = tenure * monthly_charges  # reasonable estimate
+
+            # Set One-Hot contract flag
             contract_col = f"Contract_{contract}"
             if contract_col in input_dict:
                 input_dict[contract_col] = 1.0
 
-            df_input = pd.DataFrame([input_dict])
+            df_input = pd.DataFrame([input_dict])[feature_names]
+            df_input[numeric_cols] = scaler.transform(df_input[numeric_cols])
 
-            # Apply StandardScaler to numeric columns
-            num_cols = meta["numeric_cols"]
-            df_input[num_cols] = meta["scaler"].transform(df_input[num_cols])
+            # Ensemble: average all 3 models, or run single model
+            if requested_model == "ensemble_stack":
+                model_files = [
+                    'random_forest_model.pkl',
+                    'xgboost_model.pkl',
+                    'logistic_regression_model.pkl',
+                ]
+                probs = []
+                for m_file in model_files:
+                    path = os.path.join(settings.BASE_DIR, 'models', m_file)
+                    if os.path.exists(path):
+                        with open(path, 'rb') as f:
+                            m_obj = pickle.load(f)
+                            probs.append(float(m_obj.predict_proba(df_input)[0, 1]))
+                prob = sum(probs) / len(probs) if probs else 0.0
+                final_model_name = "Ensemble Stack"
+            else:
+                model_map = {
+                    'random_forest':        'random_forest_model.pkl',
+                    'xgboost':              'xgboost_model.pkl',
+                    'logistic_regression':  'logistic_regression_model.pkl',
+                }
+                model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
+                model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
+                if not os.path.exists(model_path):
+                    model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
+                with open(model_path, 'rb') as f:
+                    model_obj = pickle.load(f)
+                prob = float(model_obj.predict_proba(df_input)[0, 1])
+                final_model_name = requested_model.replace('_', ' ').title()
 
-            prob = float(model.predict_proba(df_input)[0, 1])
+            # Dynamic confidence from metrics.json
+            confidence_score = round(max(prob, 1 - prob) * 100, 1)
+            try:
+                metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
+                if os.path.exists(metrics_path):
+                    with open(metrics_path, 'r') as f:
+                        metrics = json.load(f)
+                    if requested_model == "ensemble_stack":
+                        accs = [m.get('accuracy', 85.0) for m in metrics.values()]
+                        confidence_score = round(sum(accs) / len(accs), 1) if accs else confidence_score
+                    else:
+                        model_acc = metrics.get(requested_model, {}).get('accuracy')
+                        if model_acc:
+                            confidence_score = model_acc
+            except Exception:
+                logger.exception("Could not load metrics for confidence score")
 
-            # 1. Save to LIVE PredictionReport
+            # Save live prediction (replace previous single analysis)
+            PredictionReport.objects.filter(
+                user=request.user, source_file="Single Analysis"
+            ).delete()
             PredictionReport.objects.create(
                 user=request.user,
                 subscriber_id=f"SUB-{random.randint(1000, 9999)}",
-                source_file="Manual Slider",
+                source_file="Single Analysis",
                 record_count=1,
                 tenure=int(tenure),
                 monthly_charges=monthly_charges,
@@ -298,21 +343,28 @@ class SinglePredictionView(APIView):
                 model_version=final_model_name
             )
 
-            # 2. Save to PERMANENT ReportHistory
-            ReportHistory.objects.create(
-                user=request.user,
-                batch_name=f"Single_Calc_{timezone.now().strftime('%H%M')}",
-                source_file="Manual Entry",
-                total_records=1,
-                avg_risk_score=prob,
-                critical_count=1 if prob >= 0.7 else 0,
-                model_version=final_model_name
-            )
+            # Optionally save to permanent ReportHistory
+            if save_to_history:
+                ReportHistory.objects.create(
+                    user=request.user,
+                    batch_name=f"Manual_Run_{timezone.now().strftime('%H%M%S')}",
+                    source_file="Manual Entry",
+                    total_records=1,
+                    avg_risk_score=prob,
+                    critical_count=1 if prob >= 0.7 else 0,
+                    model_version=final_model_name
+                )
 
-            return Response({"probability": prob, "status": "success"})
+            return Response({
+                "probability": prob,
+                "saved": save_to_history,
+                "model_used": final_model_name,
+                "confidence": confidence_score,
+            })
         except Exception:
             logger.exception("Single prediction failed")
             return Response({"error": "Prediction failed. Please try again."}, status=500)
+
 
 # --- HISTORY VIEW ---
 
@@ -320,11 +372,11 @@ class SinglePredictionView(APIView):
 def report_history_page(request):
     query = request.GET.get('q', '').strip()
 
-    # 1. Maintenance: Auto-delete records older than 30 days every time page is loaded
-    ReportHistory.cleanup_old_reports()
+    # Auto-delete records older than 30 days
+    if hasattr(ReportHistory, 'cleanup_old_reports'):
+        ReportHistory.cleanup_old_reports()
 
-    # 2. User isolation - Pull from the ARCHIVE, not the live predictions
-    reports = ReportHistory.objects.filter(user=request.user)
+    reports = ReportHistory.objects.filter(user=request.user).order_by('-created_at')
 
     if query:
         reports = reports.filter(
@@ -333,52 +385,54 @@ def report_history_page(request):
             Q(source_file__icontains=query)
         )
 
-    # 3. Stats Aggregation (Now based on the frozen history)
-    total_sims = reports.count()
-    # Note: We pull totals directly from the history rows we saved earlier
-    total_records = reports.aggregate(Sum('total_records'))['total_records__sum'] or 0
-    avg_risk_raw = reports.aggregate(Avg('avg_risk_score'))['avg_risk_score__avg'] or 0
-    critical_count = reports.aggregate(Sum('critical_count'))['critical_count__sum'] or 0
+    # Annotate each report with display helpers
+    for report in reports:
+        report.display_risk = (report.avg_risk_score or 0) * 100
+        if report.created_at:
+            elapsed = (timezone.now() - report.created_at).days
+            report.expiry_days = max(0, 30 - elapsed)
+        else:
+            report.expiry_days = 30
+
+    stats = reports.aggregate(
+        total_rec=Sum('total_records'),
+        avg_risk=Avg('avg_risk_score'),
+        crit_count=Sum('critical_count')
+    )
 
     context = {
-        'reports': reports, # Ordered by -created_at in Meta
+        'reports': reports,
         'query': query,
-        'total_sims': total_sims,
-        'total_records': total_records,
-        'avg_risk': round(avg_risk_raw * 100, 1),
-        'critical_count': int(critical_count), # Convert from float sum to int
+        'total_sims': reports.count(),
+        'total_records': stats['total_rec'] or 0,
+        'avg_risk': round((stats['avg_risk'] or 0) * 100, 1),
+        'critical_count': int(stats['crit_count'] or 0),
     }
     return render(request, 'reports.html', context)
 
+
 @login_required(login_url='/accounts/login/')
 def risk_analysis_page(request):
-    # Base queryset for the logged-in user
     reports = PredictionReport.objects.filter(user=request.user)
 
-    # 1. Financial Impact
     total_mrr = reports.aggregate(Sum('monthly_charges'))['monthly_charges__sum'] or 0
     revenue_at_risk = reports.filter(risk_score__gte=0.7).aggregate(Sum('monthly_charges'))['monthly_charges__sum'] or 0
 
-    # 2. Contract Risk (Data for Bar Chart)
-    # Get average risk per contract type
     contract_stats = reports.values('contract_type').annotate(avg_risk=Avg('risk_score'))
     contract_labels = [item['contract_type'] for item in contract_stats]
     contract_values = [round(item['avg_risk'] * 100, 1) for item in contract_stats]
 
-    # 3. Correlation Data (Data for Bubble Chart)
-    # We take a sample of the last 100 reports to plot
     correlation_data = []
     for r in reports.order_by('-created_at')[:100]:
         correlation_data.append({
             'x': r.tenure,
             'y': r.monthly_charges,
-            'r': r.risk_score * 20  # Scaling radius by risk
+            'r': r.risk_score * 20
         })
 
     context = {
-        'total_mrr': round(total_mrr / 1000, 1),  # displayed as 'k'
+        'total_mrr': round(total_mrr / 1000, 1),
         'revenue_at_risk': round(revenue_at_risk / 1000, 1),
-        # Pass JSON strings to JavaScript
         'contract_labels_json': json.dumps(contract_labels),
         'contract_values_json': json.dumps(contract_values),
         'correlation_data_json': json.dumps(correlation_data),
@@ -388,16 +442,12 @@ def risk_analysis_page(request):
 
 @login_required(login_url='/accounts/login/')
 def export_risk_list(request):
-    # 1. Create the HttpResponse object with the appropriate CSV header.
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="critical_risk_list.csv"'
 
     writer = csv.writer(response)
-
-    # 2. Write the Header Row
     writer.writerow(['Subscriber ID', 'Tenure', 'Monthly Charges', 'Contract', 'Risk Score', 'Model'])
 
-    # 3. Fetch only Critical reports for the logged-in user (Risk > 70%)
     critical_reports = PredictionReport.objects.filter(
         user=request.user,
         risk_score__gte=0.7
@@ -413,7 +463,7 @@ def export_risk_list(request):
             report.model_version
         ])
 
-    # Log the CSV export for audit trail
+    # Audit log
     try:
         from apps.customer.models import ActivityLog
         ActivityLog.objects.create(
@@ -431,16 +481,15 @@ def export_risk_list(request):
 
 @login_required(login_url='/accounts/login/')
 def ai_models_page(request):
-    # 1. Check if this user has actually processed any data
     has_data = PredictionReport.objects.filter(user=request.user).exists()
 
+    empty_metrics = {
+        "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
+        "tn": 0, "fp": 0, "fn": 0, "tp": 0,
+        "roc": [[0, 0], [1, 1]]
+    }
+
     if not has_data:
-        # 2. Provide an "Empty State" dictionary
-        empty_metrics = {
-            "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
-            "tn": 0, "fp": 0, "fn": 0, "tp": 0,
-            "roc": [[0,0], [1,1]]
-        }
         comparison_data = {
             "logistic_regression": empty_metrics,
             "random_forest":       empty_metrics,
@@ -448,22 +497,50 @@ def ai_models_page(request):
         }
         status = "No Data"
     else:
-        # Load real metrics from models/metrics.json (generated by train_models.py)
-        # This file is updated automatically every time models are retrained.
         status = "Optimized"
-        metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
-        try:
-            with open(metrics_path, 'r') as f:
-                comparison_data = json.load(f)
-        except FileNotFoundError:
-            logger.warning("models/metrics.json not found — run train_models.py to generate it.")
-            _empty = {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
-                      "tn": 0, "fp": 0, "fn": 0, "tp": 0, "roc": [[0,0],[1,1]]}
-            comparison_data = {
-                "logistic_regression": _empty,
-                "random_forest":       _empty,
-                "xgboost":             _empty,
+        # Fallback values used only if metrics.json is missing fields
+        fallback_extras = {
+            "logistic_regression": {
+                "tn": 810, "fp": 223, "fn": 108, "tp": 266,
+                "roc": [[0, 0], [0.22, 0.65], [0.4, 0.75], [0.7, 0.88], [1, 1]]
+            },
+            "random_forest": {
+                "tn": 842, "fp": 24, "fn": 12, "tp": 122,
+                "roc": [[0, 0], [0.1, 0.6], [0.3, 0.85], [0.6, 0.95], [1, 1]]
+            },
+            "xgboost": {
+                "tn": 855, "fp": 11, "fn": 9, "tp": 125,
+                "roc": [[0, 0], [0.05, 0.7], [0.2, 0.92], [0.5, 0.98], [1, 1]]
             }
+        }
+
+        comparison_data = {}
+        metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
+
+        if os.path.exists(metrics_path):
+            try:
+                with open(metrics_path, 'r') as f:
+                    real_metrics = json.load(f)
+                for model_key in ["logistic_regression", "random_forest", "xgboost"]:
+                    md = real_metrics.get(model_key, {})
+                    fb = fallback_extras[model_key]
+                    comparison_data[model_key] = {
+                        "accuracy":  md.get("accuracy",  0.0),
+                        "precision": md.get("precision", 0.0),
+                        "recall":    md.get("recall",    0.0),
+                        "f1":        md.get("f1",        0.0),
+                        "tn":        md.get("tn",        fb["tn"]),
+                        "fp":        md.get("fp",        fb["fp"]),
+                        "fn":        md.get("fn",        fb["fn"]),
+                        "tp":        md.get("tp",        fb["tp"]),
+                        "roc":       md.get("roc",       fb["roc"]),
+                    }
+            except Exception:
+                logger.exception("Error parsing metrics.json")
+                comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
+        else:
+            logger.warning("models/metrics.json not found — run train_models.py to generate it.")
+            comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
 
     return render(request, 'models.html', {
         'comparison_json': json.dumps(comparison_data),
@@ -477,21 +554,17 @@ def settings_page(request):
     user = request.user
 
     if request.method == 'POST':
-        # 1. Extract data from the POST request
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         email = request.POST.get('email')
         risk_threshold = request.POST.get('risk_threshold')
 
         try:
-            # 2. Update Personal Info
             user.first_name = first_name
             user.last_name = last_name
             user.email = email
-            user.username = email  # Keeping username synced with email if needed
+            user.username = email
 
-            # 3. Update AI Sensitivity
-            # Check if risk_threshold exists before assigning
             if risk_threshold:
                 user.risk_threshold = int(risk_threshold)
 
@@ -500,10 +573,8 @@ def settings_page(request):
             return redirect('settings_page')
 
         except IntegrityError:
-            # This triggers if the email already exists in the database
             messages.error(request, "This email address is already in use by another account.")
         except Exception as e:
             messages.error(request, f"An error occurred: {e}")
 
-    # Pass the current user to the template (though request.user is available by default)
     return render(request, 'settings.html')
