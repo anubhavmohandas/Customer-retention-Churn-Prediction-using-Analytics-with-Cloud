@@ -1,9 +1,45 @@
-*.png
-*.pkl
-saved_models/
-dataset/
-__pycache__/
-.streamlit/
-*.pyc
+# --- Secrets / envs ---
 .env
-dataset.zip
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.Python
+build/
+dist/
+pip-log.txt
+
+# --- Virtualenvs ---
+myvenv/
+venv/
+env/
+.venv/
+
+# --- Django ---
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# --- Dataset (too large, re-download from Kaggle if needed) ---
+dataset/
+
+# --- NOTE: do NOT ignore *.pkl — trained models must go in the repo ---
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Deploy artifacts ---
+*.pid
+*.sock
