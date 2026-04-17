@@ -157,14 +157,14 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    # CompressedStaticFilesStorage: gzip/brotli compression but no manifest
+    # hashing. Chosen over CompressedManifestStaticFilesStorage because the
+    # latter strict-checks asset references and crashes on missing source
+    # maps shipped by django-jazzmin (bootstrap.bundle.min.js.map etc.).
     'staticfiles': {
-        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
-
-# Don't explode if a CSS/JS file references a non-existent source map or asset
-# (common with third-party admin themes like django-jazzmin).
-WHITENOISE_MANIFEST_STRICT = False
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
