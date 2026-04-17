@@ -11,6 +11,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Q, Avg, Sum
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings
@@ -214,8 +215,9 @@ class BulkPredictionView(APIView):
                 "med_risk_count": int(((predictions <= 0.7) & (predictions > 0.3)).sum()),
                 "low_risk_count": int((predictions <= 0.3).sum()),
             })
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        except Exception:
+            logger.exception("Bulk prediction failed")
+            return Response({"error": "Prediction failed. Please check your file and try again."}, status=500)
 
 class SinglePredictionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -277,8 +279,9 @@ class SinglePredictionView(APIView):
             )
 
             return Response({"probability": prob, "status": "success"})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        except Exception:
+            logger.exception("Single prediction failed")
+            return Response({"error": "Prediction failed. Please try again."}, status=500)
 
 # --- HISTORY VIEW ---
 
@@ -382,6 +385,7 @@ def export_risk_list(request):
     return response
 
 
+@login_required(login_url='/accounts/login/')
 def ai_models_page(request):
     # 1. Check if this user has actually processed any data
     has_data = PredictionReport.objects.filter(user=request.user).exists()
