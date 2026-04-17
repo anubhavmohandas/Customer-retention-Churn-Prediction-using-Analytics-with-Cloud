@@ -158,6 +158,13 @@ class BulkPredictionView(APIView):
             if not file_obj:
                 return Response({"error": "No file uploaded"}, status=400)
 
+            MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+            if file_obj.size > MAX_UPLOAD_BYTES:
+                return Response(
+                    {"error": f"File too large ({file_obj.size // (1024*1024)} MB). Maximum allowed is 10 MB."},
+                    status=400
+                )
+
             # 1. Model Selection
             model_map = {
                 'random_forest':        'random_forest_model.pkl',

@@ -57,18 +57,32 @@ if (dropZone && fileInput) {
     };
 }
 
+const MAX_CSV_BYTES = 10 * 1024 * 1024; // 10 MB
+
 function handleFiles() {
     const file = fileInput.files[0];
-    if (file && file.name.endsWith('.csv')) {
-        currentUploadedFile = file;
-        document.getElementById('file-name-text').textContent = file.name;
-        document.getElementById('upload-zone-container').classList.add('hidden');
-        document.getElementById('data-preview-container').classList.remove('hidden');
+    if (!file) return;
 
-        const btn = document.getElementById('run-bulk-btn');
-        btn.disabled = false;
-        btn.className = "w-full bg-black dark:bg-white text-white dark:text-black py-5 curved font-extrabold text-sm tracking-widest uppercase transition-all";
+    if (!file.name.endsWith('.csv')) {
+        alert('Only CSV files are accepted.');
+        fileInput.value = '';
+        return;
     }
+
+    if (file.size > MAX_CSV_BYTES) {
+        alert(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 10 MB.`);
+        fileInput.value = '';
+        return;
+    }
+
+    currentUploadedFile = file;
+    document.getElementById('file-name-text').textContent = file.name;
+    document.getElementById('upload-zone-container').classList.add('hidden');
+    document.getElementById('data-preview-container').classList.remove('hidden');
+
+    const btn = document.getElementById('run-bulk-btn');
+    btn.disabled = false;
+    btn.className = "w-full bg-black dark:bg-white text-white dark:text-black py-5 curved font-extrabold text-sm tracking-widest uppercase transition-all";
 }
 
 function resetUpload() {
@@ -99,20 +113,36 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// 1. Single Subscriber Simulation (With Intelligence Features)
-async function runSingleSimulation() {
+// 1. Single Subscriber Simulation
+// saveToHistory=true  → "Run ML Prediction" button — saves result to ReportHistory
+// saveToHistory=false → slider/select changes — live preview only
+async function runSingleSimulation(saveToHistory = false) {
     const outcomeVal = document.getElementById('outcome-value');
     const badge = document.getElementById('risk-badge');
     const mrrImpact = document.getElementById('mrr-impact');
     const recommendation = document.getElementById('ai-recommendation');
 
-    const monthlyCharges = document.getElementById('slider-charges').value;
+    const monthlyCharges = parseFloat(document.getElementById('slider-charges').value);
+    const tenure = parseFloat(document.getElementById('slider-tenure').value);
+    const contract = document.getElementById('select-contract').value;
+
     const payload = {
-        tenure: document.getElementById('slider-tenure').value,
+        tenure,
         monthly_charges: monthlyCharges,
-        contract: document.getElementById('select-contract').value,
-        model: document.getElementById('model-select-single').value
+        contract,
+        model: document.getElementById('model-select-single').value,
+        save_to_history: saveToHistory,
     };
+
+    // Show loading state on the explicit "Run" button
+    const runBtn = document.getElementById('run-single-btn');
+    const spinner = document.getElementById('single-spinner');
+    const btnText = document.getElementById('single-btn-text');
+    if (saveToHistory && runBtn) {
+        runBtn.disabled = true;
+        spinner.classList.remove('hidden');
+        btnText.textContent = 'Running…';
+    }
 
     try {
         const response = await fetch('/api/predict-single/', {
@@ -129,21 +159,39 @@ async function runSingleSimulation() {
             const prob = data.probability;
             const risk = (prob * 100).toFixed(1);
 
-            // A. Update Probability
+            // A. Probability display
             outcomeVal.textContent = risk + '%';
 
-            // B. Update AI Confidence (how certain the model is in its prediction, either way)
+            // B. AI Confidence
             const confidenceEl = document.getElementById('ai-confidence');
             if (confidenceEl) {
-                const confidence = (Math.max(prob, 1 - prob) * 100).toFixed(1);
+                const confidence = data.confidence
+                    ? data.confidence.toFixed(1)
+                    : (Math.max(prob, 1 - prob) * 100).toFixed(1);
                 confidenceEl.textContent = confidence + '%';
             }
 
-            // B. Update Financial Impact (Revenue at Risk)
+            // C. Revenue at Risk
             const impact = (monthlyCharges * prob).toFixed(2);
             mrrImpact.textContent = '$' + impact;
 
-            // C. UI Color & AI Recommendation Logic
+            // D. Factor bars — contract weight and tenure weight
+            const contractBar = document.getElementById('factor-contract-bar');
+            const tenureBar   = document.getElementById('factor-tenure-bar');
+            if (contractBar) {
+                // Month-to-month is the highest risk contract; weight reflects that
+                const contractWeight = contract === 'Month-to-month' ? Math.min(95, risk * 1.1)
+                                     : contract === 'One year'       ? Math.min(60, risk * 0.7)
+                                     :                                  Math.min(30, risk * 0.4);
+                contractBar.style.width = contractWeight.toFixed(0) + '%';
+            }
+            if (tenureBar) {
+                // Shorter tenure = higher risk; invert the 1–72 range
+                const tenureWeight = Math.max(5, 100 - (tenure / 72) * 100);
+                tenureBar.style.width = Math.min(tenureWeight, risk * 1.05).toFixed(0) + '%';
+            }
+
+            // E. Risk badge & recommendation
             if (risk > 70) {
                 outcomeVal.className = "text-7xl font-extrabold mb-2 text-red-500 animate-pulse";
                 badge.textContent = "CRITICAL RISK";
@@ -160,9 +208,23 @@ async function runSingleSimulation() {
                 badge.className = "inline-block px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-100 text-emerald-600";
                 recommendation.textContent = "Customer is healthy. This is an ideal candidate for upselling high-tier data plans.";
             }
+
+            // F. Notify user if saved
+            if (saveToHistory && data.saved) {
+                btnText.textContent = '✓ Saved to History';
+                setTimeout(() => { btnText.textContent = 'Run ML Prediction'; }, 2000);
+            }
+        } else {
+            console.error("Prediction error:", data.error);
         }
     } catch (err) {
         console.error("Simulation failed", err);
+    } finally {
+        if (saveToHistory && runBtn) {
+            runBtn.disabled = false;
+            spinner.classList.add('hidden');
+            if (btnText.textContent === 'Running…') btnText.textContent = 'Run ML Prediction';
+        }
     }
 }
 

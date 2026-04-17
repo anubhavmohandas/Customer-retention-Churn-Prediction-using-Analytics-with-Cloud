@@ -18,3 +18,57 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="{% static 'admin/css/custom_admin.css' %}">
 {% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+  // Force light mode before the page renders — django-admin-interface reads these on load
+  try {
+    localStorage.setItem('color-scheme', 'light');
+    localStorage.setItem('admin-color-scheme', 'light');
+    localStorage.setItem('django-admin-interface-color-scheme', 'light');
+    localStorage.setItem('theme', 'light');
+  } catch(e) {}
+  document.documentElement.setAttribute('data-color-scheme', 'light');
+  document.documentElement.setAttribute('data-theme', 'light');
+  document.documentElement.classList.remove('dark');
+</script>
+{% endblock %}
+
+{% block footer %}
+{{ block.super }}
+<script>
+  // Remove the color-scheme toggle button from the DOM entirely
+  (function removeThemeToggle() {
+    function purge() {
+      // django-admin-interface renders the button inside #user-tools or #header
+      const selectors = [
+        'button[data-color-scheme-toggle]',
+        'a[data-color-scheme-toggle]',
+        '.color-scheme-toggle',
+        '.theme-toggle',
+        '#header button',
+        '#user-tools button',
+        'button[title*="olor"]',
+        'button[aria-label*="olor"]',
+        'button[title*="heme"]',
+        'button[aria-label*="heme"]',
+        'button[title*="ark"]',
+        'button[aria-label*="ark"]',
+        'button[title*="ight"]',
+        'button[aria-label*="ight"]',
+      ];
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => el.remove());
+      });
+      // Also lock the scheme so any lingering JS can't flip it back
+      document.documentElement.setAttribute('data-color-scheme', 'light');
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.classList.remove('dark');
+    }
+    // Run immediately, then once more after DOM settles
+    purge();
+    document.addEventListener('DOMContentLoaded', purge);
+  })();
+</script>
+{% endblock %}

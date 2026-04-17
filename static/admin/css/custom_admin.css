@@ -50,15 +50,23 @@ html, body {
   color: #111827 !important;
 }
 
-/* Hide the moon/sun dark-mode toggle button */
+/* Hide the moon/sun dark-mode toggle — every possible selector */
 #header button,
-#header [data-color-scheme-toggle],
+#user-tools button,
+#header a[data-color-scheme-toggle],
+#header button[data-color-scheme-toggle],
+[data-color-scheme-toggle],
 .color-scheme-toggle,
 button.theme-toggle,
 a.theme-toggle,
+[data-theme-toggle],
 #header > div > button,
-#header li > button {
+#header li > button,
+#header button[title],
+#header button[aria-label] {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* ── FONTS ── */

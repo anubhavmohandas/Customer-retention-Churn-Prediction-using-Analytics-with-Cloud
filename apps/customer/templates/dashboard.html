@@ -26,7 +26,7 @@
           <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 dark:text-white">Telecom Churn Overview</h2>
           <p class="text-gray-500 dark:text-zinc-400 flex items-center gap-2">
             <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-            Network metrics powered by <span class="font-bold text-black dark:text-white ml-1">RF_CORE_V1</span>
+            Network metrics powered by <span class="font-bold text-black dark:text-white ml-1">Retain.Ai Intelligence</span>
           </p>
         </div>
         <a href="{% url 'prediction_page' %}" class="bg-black dark:bg-white dark:text-black text-white px-6 py-3.5 md:px-8 md:py-4 curved font-bold text-sm hover:scale-95 transition-all shadow-xl shadow-black/10 self-start sm:self-auto whitespace-nowrap inline-block text-center">
@@ -111,9 +111,9 @@
                     </span>
                   </td>
                   <td class="px-8 py-5 text-right">
-                    <button class="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-95 transition">
-                      Draft Offer
-                    </button>
+                    <a href="{% url 'prediction_page' %}" class="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-95 transition inline-block">
+                      Analyse
+                    </a>
                   </td>
                 </tr>
                 {% empty %}
