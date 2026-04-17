@@ -15,6 +15,7 @@ from django.db import IntegrityError
 from django.db.models import Q, Avg, Sum
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings
+from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,10 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 from django.utils import timezone
-from .models import Customer, PredictionReport, ReportHistory
+from django.core.cache import cache
+from django.contrib.auth import update_session_auth_hash
+from .models import Customer, PredictionReport, ReportHistory, ActivityLog
 import csv
-from django.db.models import Avg, Sum, Count
 
 # --- AUTH VIEWS ---
 
@@ -74,18 +76,29 @@ def login_page(request):
 def login_view(request):
     if request.method == "POST":
         try:
+            # Rate limiting: 5 attempts per IP per 15 minutes
+            ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+                  or request.META.get('REMOTE_ADDR', ''))
+            cache_key = f"login_attempts_{ip}"
+            attempts = cache.get(cache_key, 0)
+            if attempts >= 5:
+                return JsonResponse({"error": "Too many login attempts. Please wait 15 minutes."}, status=429)
+
             data = json.loads(request.body)
             email = data.get("email")
             password = data.get("password")
             user = authenticate(request, username=email, password=password)
 
             if user is not None:
+                cache.delete(cache_key)  # Reset attempts on success
                 login(request, user)
                 return JsonResponse({
                     "message": "Login successful",
                     "user_id": user.id,
                     "full_name": f"{user.first_name} {user.last_name}"
                 }, status=200)
+
+            cache.set(cache_key, attempts + 1, 900)  # 900s = 15 minutes
             return JsonResponse({"error": "Invalid email or password"}, status=400)
         except Exception:
             logger.exception("Login failed")
@@ -122,7 +135,7 @@ def dashboard_page(request):
         'potential_recovery': mrr_at_risk * 0.2,
         'contract_stats': contract_stats,
         'priority_queue': user_reports.filter(risk_score__gte=0.7).order_by('-monthly_charges')[:5],
-        'total_predictions': user_reports.count(),
+        'total_predictions': user_reports.aggregate(t=Sum('record_count'))['t'] or 0,
     }
     return render(request, 'dashboard.html', context)
 
@@ -151,17 +164,11 @@ class BulkPredictionView(APIView):
                 'xgboost':              'xgboost_model.pkl',
                 'logistic_regression':  'logistic_regression_model.pkl',
             }
-            model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
-            model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
-            if not os.path.exists(model_path):
-                model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
-                final_model_name = 'random_forest'
-            else:
-                final_model_name = requested_model
+            is_ensemble = (requested_model == 'ensemble_stack')
+            final_model_name = requested_model
 
             # 2. Load Assets
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
+            # (model loaded later — either single or ensemble)
             with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
                 meta = pickle.load(f)
 
@@ -187,16 +194,29 @@ class BulkPredictionView(APIView):
             num_cols = meta["numeric_cols"]
             df_encoded[num_cols] = meta["scaler"].transform(df_encoded[num_cols])
 
-            # 4. Predict
-            predictions = model.predict_proba(df_encoded)[:, 1]
+            # 4. Predict (single model or ensemble average)
+            if is_ensemble:
+                all_probs = []
+                for fname in model_map.values():
+                    p = os.path.join(settings.BASE_DIR, 'models', fname)
+                    if os.path.exists(p):
+                        with open(p, 'rb') as f:
+                            all_probs.append(pickle.load(f).predict_proba(df_encoded)[:, 1])
+                predictions = np.mean(all_probs, axis=0) if all_probs else np.zeros(len(df_encoded))
+                final_model_name = 'ensemble_stack'
+            else:
+                model_filename = model_map.get(requested_model, 'random_forest_model.pkl')
+                model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
+                if not os.path.exists(model_path):
+                    model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
+                    final_model_name = 'random_forest'
+                with open(model_path, 'rb') as f:
+                    model = pickle.load(f)
+                predictions = model.predict_proba(df_encoded)[:, 1]
             avg_risk = float(predictions.mean())
             high_risk_count = int((predictions > 0.7).sum())
 
-            # 5. Clear stale bulk records, save fresh snapshot
-            PredictionReport.objects.filter(
-                user=request.user
-            ).exclude(source_file="Single Analysis").delete()
-
+            # 5. Save snapshot, then trim bulk records to last 10
             PredictionReport.objects.create(
                 user=request.user,
                 subscriber_id=f"BATCH-{random.randint(100, 999)}",
@@ -208,6 +228,14 @@ class BulkPredictionView(APIView):
                 risk_score=avg_risk,
                 model_version=final_model_name
             )
+
+            # Trim bulk PredictionReport records to last 10 (keep Single Analysis untouched)
+            bulk_qs = PredictionReport.objects.filter(
+                user=request.user
+            ).exclude(source_file="Single Analysis").order_by('-created_at')
+            excess_ids = list(bulk_qs.values_list('id', flat=True)[10:])
+            if excess_ids:
+                PredictionReport.objects.filter(id__in=excess_ids).delete()
 
             # 6. Save to permanent ReportHistory
             ReportHistory.objects.create(
@@ -372,9 +400,11 @@ class SinglePredictionView(APIView):
 def report_history_page(request):
     query = request.GET.get('q', '').strip()
 
-    # Auto-delete records older than 30 days
-    if hasattr(ReportHistory, 'cleanup_old_reports'):
+    # Auto-delete records older than 30 days — throttled to once per day per user
+    cleanup_key = f"cleanup_done_{request.user.id}"
+    if not cache.get(cleanup_key):
         ReportHistory.cleanup_old_reports()
+        cache.set(cleanup_key, True, 86400)  # 24 hours
 
     reports = ReportHistory.objects.filter(user=request.user).order_by('-created_at')
 
@@ -385,23 +415,29 @@ def report_history_page(request):
             Q(source_file__icontains=query)
         )
 
-    # Annotate each report with display helpers
-    for report in reports:
-        report.display_risk = (report.avg_risk_score or 0) * 100
-        if report.created_at:
-            elapsed = (timezone.now() - report.created_at).days
-            report.expiry_days = max(0, 30 - elapsed)
-        else:
-            report.expiry_days = 30
-
+    # Aggregate stats over full queryset before paginating
     stats = reports.aggregate(
         total_rec=Sum('total_records'),
         avg_risk=Avg('avg_risk_score'),
         crit_count=Sum('critical_count')
     )
 
+    # Annotate display helpers
+    annotated = []
+    for report in reports:
+        report.display_risk = (report.avg_risk_score or 0) * 100
+        elapsed = (timezone.now() - report.created_at).days if report.created_at else 0
+        report.expiry_days = max(0, 30 - elapsed)
+        annotated.append(report)
+
+    # Paginate — 30 records per page
+    paginator = Paginator(annotated, 30)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'reports': reports,
+        'reports': page_obj,
+        'page_obj': page_obj,
         'query': query,
         'total_sims': reports.count(),
         'total_records': stats['total_rec'] or 0,
@@ -481,66 +517,44 @@ def export_risk_list(request):
 
 @login_required(login_url='/accounts/login/')
 def ai_models_page(request):
-    has_data = PredictionReport.objects.filter(user=request.user).exists()
-
+    # Model metrics are training-time results — always show them regardless of user activity
     empty_metrics = {
         "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
         "tn": 0, "fp": 0, "fn": 0, "tp": 0,
         "roc": [[0, 0], [1, 1]]
     }
 
-    if not has_data:
-        comparison_data = {
-            "logistic_regression": empty_metrics,
-            "random_forest":       empty_metrics,
-            "xgboost":             empty_metrics,
-        }
-        status = "No Data"
-    else:
-        status = "Optimized"
-        # Fallback values used only if metrics.json is missing fields
-        fallback_extras = {
-            "logistic_regression": {
-                "tn": 810, "fp": 223, "fn": 108, "tp": 266,
-                "roc": [[0, 0], [0.22, 0.65], [0.4, 0.75], [0.7, 0.88], [1, 1]]
-            },
-            "random_forest": {
-                "tn": 842, "fp": 24, "fn": 12, "tp": 122,
-                "roc": [[0, 0], [0.1, 0.6], [0.3, 0.85], [0.6, 0.95], [1, 1]]
-            },
-            "xgboost": {
-                "tn": 855, "fp": 11, "fn": 9, "tp": 125,
-                "roc": [[0, 0], [0.05, 0.7], [0.2, 0.92], [0.5, 0.98], [1, 1]]
-            }
-        }
+    metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
+    comparison_data = {}
 
-        comparison_data = {}
-        metrics_path = os.path.join(settings.BASE_DIR, 'models', 'metrics.json')
-
-        if os.path.exists(metrics_path):
-            try:
-                with open(metrics_path, 'r') as f:
-                    real_metrics = json.load(f)
-                for model_key in ["logistic_regression", "random_forest", "xgboost"]:
-                    md = real_metrics.get(model_key, {})
-                    fb = fallback_extras[model_key]
-                    comparison_data[model_key] = {
-                        "accuracy":  md.get("accuracy",  0.0),
-                        "precision": md.get("precision", 0.0),
-                        "recall":    md.get("recall",    0.0),
-                        "f1":        md.get("f1",        0.0),
-                        "tn":        md.get("tn",        fb["tn"]),
-                        "fp":        md.get("fp",        fb["fp"]),
-                        "fn":        md.get("fn",        fb["fn"]),
-                        "tp":        md.get("tp",        fb["tp"]),
-                        "roc":       md.get("roc",       fb["roc"]),
-                    }
-            except Exception:
-                logger.exception("Error parsing metrics.json")
-                comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
-        else:
-            logger.warning("models/metrics.json not found — run train_models.py to generate it.")
+    if os.path.exists(metrics_path):
+        try:
+            with open(metrics_path, 'r') as f:
+                real_metrics = json.load(f)
+            for model_key in ["logistic_regression", "random_forest", "xgboost"]:
+                md = real_metrics.get(model_key, {})
+                comparison_data[model_key] = {
+                    "accuracy":  md.get("accuracy",  0.0),
+                    "precision": md.get("precision", 0.0),
+                    "recall":    md.get("recall",    0.0),
+                    "f1":        md.get("f1",        0.0),
+                    "tn":        md.get("tn",        0),
+                    "fp":        md.get("fp",        0),
+                    "fn":        md.get("fn",        0),
+                    "tp":        md.get("tp",        0),
+                    "roc":       md.get("roc",       [[0, 0], [1, 1]]),
+                }
+            status = "Optimized"
+        except Exception:
+            logger.exception("Error parsing metrics.json")
             comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
+            status = "Error"
+    else:
+        logger.warning("models/metrics.json not found — run train_models.py to generate it.")
+        comparison_data = {m: empty_metrics for m in ["logistic_regression", "random_forest", "xgboost"]}
+        status = "Not Trained"
+
+    has_data = PredictionReport.objects.filter(user=request.user).exists()
 
     return render(request, 'models.html', {
         'comparison_json': json.dumps(comparison_data),
@@ -554,6 +568,30 @@ def settings_page(request):
     user = request.user
 
     if request.method == 'POST':
+        action = request.POST.get('action', 'profile')
+
+        if action == 'password':
+            current_password = request.POST.get('current_password', '')
+            new_password = request.POST.get('new_password', '')
+            confirm_password = request.POST.get('confirm_password', '')
+
+            if not user.check_password(current_password):
+                messages.error(request, "Current password is incorrect.")
+            elif new_password != confirm_password:
+                messages.error(request, "New passwords do not match.")
+            else:
+                try:
+                    validate_password(new_password, user)
+                    user.set_password(new_password)
+                    user.save()
+                    update_session_auth_hash(request, user)  # Keep session alive after pw change
+                    messages.success(request, "Password updated successfully.")
+                except ValidationError as ve:
+                    for err in ve.messages:
+                        messages.error(request, err)
+            return redirect('settings_page')
+
+        # Default: profile update
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         email = request.POST.get('email')

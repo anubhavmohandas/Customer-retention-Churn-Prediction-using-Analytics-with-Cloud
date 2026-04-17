@@ -47,7 +47,7 @@ class PredictionReport(models.Model):
 
     # AI Engine Details
     risk_score = models.FloatField()  # Stores as 0.8523
-    model_version = models.CharField(max_length=50, default="RF_CORE_V1")
+    model_version = models.CharField(max_length=50, default="random_forest")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -133,7 +133,7 @@ class ReportHistory(models.Model):
     critical_count = models.IntegerField()
 
     # Metadata
-    model_version = models.CharField(max_length=50, default="RF_CORE_V1")
+    model_version = models.CharField(max_length=50, default="random_forest")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -148,7 +148,7 @@ class ReportHistory(models.Model):
 
     @staticmethod
     def cleanup_old_reports():
-        """Call this in your view to delete anything older than 30 days"""
+        """Delete records older than 30 days."""
         thirty_days_ago = timezone.now() - timedelta(days=30)
         ReportHistory.objects.filter(created_at__lt=thirty_days_ago).delete()
 
