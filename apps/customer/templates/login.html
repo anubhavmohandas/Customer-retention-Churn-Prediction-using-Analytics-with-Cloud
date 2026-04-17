@@ -122,7 +122,7 @@
         </div>
 
         <form id="loginForm" novalidate class="space-y-5 animate-fade-up delay-200">
-
+            {% csrf_token %}
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2" for="email">Email Address</label>
                 <div class="relative">
@@ -252,7 +252,7 @@
             try {
                 const response = await fetch('/api/login/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
                     body: JSON.stringify({ email: email, password: password })
                 });
 
