@@ -29,3 +29,4 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
 
 # Preload to share read-only memory (model pickles) across workers.
 preload_app = True
+umask = 0o007

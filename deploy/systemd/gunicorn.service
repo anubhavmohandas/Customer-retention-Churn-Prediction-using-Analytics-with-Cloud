@@ -1,6 +1,5 @@
 [Unit]
 Description=gunicorn daemon for churn_prediction
-Requires=gunicorn.socket
 After=network.target
 
 [Service]
@@ -8,8 +7,10 @@ Type=notify
 User=www-data
 Group=www-data
 RuntimeDirectory=gunicorn
+RuntimeDirectoryMode=0755
 WorkingDirectory=/opt/churn_prediction
 EnvironmentFile=/opt/churn_prediction/.env
+ExecStartPre=/bin/rm -f /run/gunicorn/churn.sock
 ExecStart=/opt/churn_prediction/.venv/bin/gunicorn \
           --config /opt/churn_prediction/deploy/gunicorn.conf.py \
           churn_prediction.wsgi:application
@@ -20,7 +21,6 @@ PrivateTmp=true
 Restart=on-failure
 RestartSec=5s
 
-# Hardening
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true

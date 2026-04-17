@@ -86,7 +86,7 @@ def login_view(request):
 #     return render(request, 'home.html')
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def dashboard_page(request):
     user_reports = PredictionReport.objects.filter(user=request.user)
 
@@ -121,7 +121,7 @@ def dashboard_page(request):
     return render(request, 'dashboard.html', context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def prediction_page(request):
     return render(request, 'prediction.html')
 
@@ -270,7 +270,7 @@ class SinglePredictionView(APIView):
 
 # --- HISTORY VIEW ---
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def report_history_page(request):
     query = request.GET.get('q', '').strip()
 
@@ -304,7 +304,7 @@ def report_history_page(request):
     }
     return render(request, 'reports.html', context)
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def risk_analysis_page(request):
     # Base queryset for the logged-in user
     reports = PredictionReport.objects.filter(user=request.user)
@@ -340,7 +340,7 @@ def risk_analysis_page(request):
     return render(request, 'risk_analysis.html', context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def export_risk_list(request):
     # 1. Create the HttpResponse object with the appropriate CSV header.
     response = HttpResponse(content_type='text/csv')
@@ -416,7 +416,7 @@ def ai_models_page(request):
     })
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/accounts/login/')
 def settings_page(request):
     user = request.user
 
