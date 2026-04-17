@@ -76,6 +76,22 @@ class PredictionReport(models.Model):
             return 0.0
 
 
+class LoginHistory(models.Model):
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='login_history')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    session_key = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Login History'
+        verbose_name_plural = 'Login History'
+
+    def __str__(self):
+        return f"{self.user.email} — {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+
+
 class ReportHistory(models.Model):
     user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='history_archives')
 
