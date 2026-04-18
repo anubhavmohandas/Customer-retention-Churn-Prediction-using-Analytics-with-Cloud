@@ -184,22 +184,31 @@ class BulkPredictionView(APIView):
             orig_df = df.copy()
 
             if 'customerID' in df.columns: df = df.drop(columns=['customerID'])
-            if 'Churn' in df.columns: df = df.drop(columns=['Churn'])
             df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce').fillna(0)
             df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors='coerce').fillna(0)
 
-            # ONE-HOT ENCODE the same categorical columns used during training
-            cat_cols = meta.get("cat_cols", [])
-            df_encoded = pd.get_dummies(
-                df, columns=[c for c in cat_cols if c in df.columns], drop_first=False
-            ).astype(float)
-
-            # Align to training feature space: add missing cols as 0, drop extra cols
-            df_encoded = df_encoded.reindex(columns=meta["feature_names"], fill_value=0)
-
-            # Apply the same StandardScaler fitted during training
+            scaler = meta["scaler"]
             num_cols = meta["numeric_cols"]
-            df_encoded[num_cols] = meta["scaler"].transform(df_encoded[num_cols])
+            feature_names = meta["feature_names"]
+
+            # Auto-detect categorical columns from the uploaded CSV so any
+            # standard telecom churn CSV works — not just the training file.
+            categorical_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
+            # Remove label/target columns if present (won't be in feature_names anyway)
+            for drop_col in ["Churn", "churn"]:
+                if drop_col in categorical_cols:
+                    categorical_cols.remove(drop_col)
+
+            df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=False)
+
+            # Align to training feature space: fill missing cols with 0, drop extras
+            for col in feature_names:
+                if col not in df_encoded.columns:
+                    df_encoded[col] = 0.0
+            df_encoded = df_encoded[feature_names].astype(float)
+
+            # Scale numeric columns with the fitted StandardScaler
+            df_encoded[num_cols] = scaler.transform(df_encoded[num_cols])
 
             # 4. Predict (single model or ensemble average)
             if is_ensemble:
