@@ -73,8 +73,8 @@
                 </span>
               </div>
               <div class="w-full bg-gray-100 dark:bg-zinc-800 h-3 rounded-full overflow-hidden">
-                <div class="h-full bg-{{ item.color }}"
-                     style="width: {{ item.risk_percent }}%"></div>
+                <div class="h-full bg-{{ item.color }} risk-bar"
+                     data-width="{{ item.risk_percent }}"></div>
               </div>
             </div>
             {% empty %}
@@ -130,5 +130,10 @@
   </div>
 
   <script src="{% static 'assets/js/main.js' %}"></script>
+  <script>
+    document.querySelectorAll('.risk-bar[data-width]').forEach(function(el) {
+      el.style.width = el.dataset.width + '%';
+    });
+  </script>
 </body>
 </html>
