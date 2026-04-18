@@ -10,7 +10,8 @@ from apps.customer.views import (
     BulkPredictionView,
     prediction_page,
     report_history_page,
-    risk_analysis_page, export_risk_list, ai_models_page, settings_page
+    risk_analysis_page, export_risk_list, ai_models_page, settings_page,
+    TrainCustomModelView
 )
 
 urlpatterns = [
@@ -35,6 +36,7 @@ urlpatterns = [
     # --- AI Prediction APIs ---
     path('api/predict-single/', SinglePredictionView.as_view(), name='predict_single'),
     path('api/predict-bulk/', BulkPredictionView.as_view(), name='predict_bulk'),
+    path('api/train-models/', TrainCustomModelView.as_view(), name='train_models'),
 
 
 ]

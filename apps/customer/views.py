@@ -5,6 +5,13 @@ import random
 import json
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve
+from imblearn.over_sampling import SMOTE
+from xgboost import XGBClassifier
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
@@ -632,3 +639,128 @@ def settings_page(request):
             messages.error(request, f"An error occurred: {e}")
 
     return render(request, 'settings.html')
+
+
+# ==========================================
+# AUTO-TRAIN VIEW
+# ==========================================
+
+class TrainCustomModelView(APIView):
+    """
+    POST /api/train-models/
+    Accepts a CSV with a 'Churn' column. Auto-detects all features,
+    trains LR + RF + XGB with SMOTE balancing, saves model artifacts
+    and updates metrics.json. Training takes 10-30 seconds.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            file_obj = request.FILES.get('file')
+            if not file_obj:
+                return Response({"error": "No file uploaded"}, status=400)
+
+            df = pd.read_csv(file_obj)
+
+            if 'Churn' not in df.columns:
+                return Response({"error": "Dataset must contain a 'Churn' column."}, status=400)
+
+            df['Churn'] = (
+                df['Churn'].astype(str).str.lower()
+                .map({'yes': 1, 'true': 1, '1': 1, 'no': 0, 'false': 0, '0': 0})
+                .fillna(0).astype(int)
+            )
+
+            if 'customerID' in df.columns:
+                df = df.drop(columns=['customerID'])
+
+            X = df.drop(columns=["Churn"])
+            y = df["Churn"]
+
+            cat_cols = X.select_dtypes(include=["object", "string", "bool"]).columns.tolist()
+            num_cols = [c for c in X.columns if c not in cat_cols]
+
+            for col in num_cols:
+                X[col] = pd.to_numeric(X[col], errors='coerce').fillna(0)
+
+            X_encoded = pd.get_dummies(X, columns=cat_cols, drop_first=False).astype(float)
+            feature_names = X_encoded.columns.tolist()
+
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_encoded, y, test_size=0.2, random_state=42, stratify=y
+            )
+
+            scaler = StandardScaler()
+            if num_cols:
+                scaled_num = [c for c in num_cols if c in X_train.columns]
+                if scaled_num:
+                    X_train[scaled_num] = scaler.fit_transform(X_train[scaled_num])
+                    X_test[scaled_num] = scaler.transform(X_test[scaled_num])
+
+            smote = SMOTE(random_state=42)
+            X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
+
+            models_to_train = {
+                "logistic_regression": LogisticRegression(max_iter=1000, random_state=42),
+                "random_forest": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+                "xgboost": XGBClassifier(n_estimators=100, random_state=42, eval_metric="logloss", verbosity=0),
+            }
+
+            MODELS_DIR = os.path.join(settings.BASE_DIR, 'models')
+            os.makedirs(MODELS_DIR, exist_ok=True)
+            json_metrics = {}
+
+            for name, clf in models_to_train.items():
+                clf.fit(X_train_sm, y_train_sm)
+
+                y_pred = clf.predict(X_test)
+                y_proba = clf.predict_proba(X_test)[:, 1]
+
+                acc   = accuracy_score(y_test, y_pred)
+                prec  = precision_score(y_test, y_pred, zero_division=0)
+                rec   = recall_score(y_test, y_pred, zero_division=0)
+                f1    = f1_score(y_test, y_pred, zero_division=0)
+
+                cm = confusion_matrix(y_test, y_pred)
+                tn, fp, fn, tp = cm.ravel() if cm.shape == (2, 2) else (0, 0, 0, 0)
+
+                fpr, tpr, _ = roc_curve(y_test, y_proba)
+                idx = np.linspace(0, len(fpr) - 1, 6, dtype=int)
+                roc_points = [[round(float(fpr[i]), 3), round(float(tpr[i]), 3)] for i in idx]
+
+                with open(os.path.join(MODELS_DIR, f"{name}_model.pkl"), "wb") as f:
+                    pickle.dump(clf, f)
+
+                json_metrics[name] = {
+                    "accuracy":  round(acc * 100, 1),
+                    "precision": round(prec * 100, 1),
+                    "recall":    round(rec * 100, 1),
+                    "f1":        round(f1 * 100, 1),
+                    "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+                    "roc": roc_points,
+                }
+
+            with open(os.path.join(MODELS_DIR, "metrics.json"), "w") as f:
+                json.dump(json_metrics, f, indent=2)
+
+            with open(os.path.join(MODELS_DIR, "metadata.pkl"), "wb") as f:
+                pickle.dump({
+                    "scaler": scaler,
+                    "numeric_cols": num_cols,
+                    "feature_names": feature_names,
+                }, f)
+
+            try:
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action='MODEL_RETRAIN',
+                    detail=f"Retrained LR + RF + XGB on {len(df):,} rows from {file_obj.name}",
+                )
+            except Exception:
+                pass
+
+            return Response({"message": "AutoML Training Complete!", "metrics": json_metrics})
+
+        except Exception as e:
+            logger.exception("Auto-train failed")
+            return Response({"error": str(e)}, status=500)

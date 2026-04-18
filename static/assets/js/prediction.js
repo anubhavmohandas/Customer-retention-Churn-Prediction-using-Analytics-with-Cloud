@@ -83,6 +83,10 @@ function handleFiles() {
     const btn = document.getElementById('run-bulk-btn');
     btn.disabled = false;
     btn.className = "w-full bg-black dark:bg-white text-white dark:text-black py-5 curved font-extrabold text-sm tracking-widest uppercase transition-all";
+
+    // Enable the Auto-Train button when a file is loaded
+    const trainBtn = document.getElementById('train-btn');
+    if (trainBtn) trainBtn.disabled = false;
 }
 
 function resetUpload() {
@@ -92,6 +96,8 @@ function resetUpload() {
     document.getElementById('data-preview-container').classList.add('hidden');
     document.getElementById('bulk-outcome-view').classList.add('hidden');
     document.getElementById('run-bulk-btn').disabled = true;
+    const trainBtn = document.getElementById('train-btn');
+    if (trainBtn) trainBtn.disabled = true;
 }
 
 /**
@@ -281,4 +287,42 @@ function updateDistribution(id, count, total) {
     const pct = total > 0 ? ((count / total) * 100).toFixed(0) : 0;
     document.getElementById(`dist-${id}-num`).textContent = count;
     document.getElementById(`dist-${id}-bar`).style.width = pct + '%';
+}
+async function trainNewModel() {
+    if (!currentUploadedFile) {
+        alert("Please upload a CSV dataset first!");
+        return;
+    }
+
+    const btn = document.getElementById('train-btn');
+    const btnText = document.getElementById('train-btn-text');
+
+    btn.disabled = true;
+    btnText.textContent = "Training... (takes 10–30 seconds)";
+    btn.classList.add("animate-pulse");
+
+    const formData = new FormData();
+    formData.append('file', currentUploadedFile);
+
+    try {
+        const response = await fetch('/api/train-models/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            alert("✅ Training complete! Models retrained on the new dataset. Visit AI Registry to see updated metrics.");
+        } else {
+            alert("❌ Training failed: " + data.error);
+        }
+    } catch (err) {
+        alert("❌ Server connection failed.");
+        console.error("Auto-train error", err);
+    } finally {
+        btnText.textContent = "🧠 Auto-Train New AI Brain";
+        btn.disabled = false;
+        btn.classList.remove("animate-pulse");
+    }
 }

@@ -116,14 +116,20 @@
                 </div>
                 <div class="border border-gray-100 dark:border-zinc-800 rounded-xl p-6 bg-gray-50 dark:bg-zinc-800/50 text-center border-dashed">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ready for Processing</p>
-                    <p class="text-xs text-gray-500 mt-2 font-medium">Click "Process Batch" below to start analysis.</p>
+                    <p class="text-xs text-gray-500 mt-2 font-medium">Click "Auto-Train" to retrain models on this dataset, or "Process Batch" to run predictions.</p>
                 </div>
             </div>
 
-            <button id="run-bulk-btn" disabled onclick="runBulkAnalysis()" class="w-full bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-600 py-5 curved font-extrabold text-[10px] tracking-widest uppercase transition-all mt-auto flex justify-center items-center gap-3">
-                <span id="bulk-btn-text">Process Batch</span>
-                <div id="bulk-spinner" class="spinner hidden w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-            </button>
+            <div class="flex flex-col gap-3 mt-auto">
+                <button id="train-btn" disabled onclick="trainNewModel()" class="w-full bg-blue-600/10 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 py-4 curved font-extrabold text-[10px] tracking-widest uppercase transition-all hover:bg-blue-600/20 flex justify-center items-center gap-3 border border-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="train-btn-text">&#129504; Auto-Train New AI Brain</span>
+                </button>
+
+                <button id="run-bulk-btn" disabled onclick="runBulkAnalysis()" class="w-full bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-600 py-5 curved font-extrabold text-[10px] tracking-widest uppercase transition-all flex justify-center items-center gap-3">
+                    <span id="bulk-btn-text">Process Batch</span>
+                    <div id="bulk-spinner" class="spinner hidden w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                </button>
+            </div>
           </div>
         </div>
 
