@@ -4,7 +4,7 @@ EDA → Preprocessing (One-Hot + StandardScaler + stratify) → SMOTE → Train 
 """
 
 import os
-import pickle
+import joblib
 import json
 import warnings
 
@@ -196,8 +196,7 @@ for key, cfg in models.items():
     print(f"     acc={acc}%  prec={prec}%  rec={rec}%  f1={f1}%  auc={auc}")
 
     path = os.path.join(MODELS_DIR, cfg["file"])
-    with open(path, "wb") as f:
-        pickle.dump(clf, f)
+    joblib.dump(clf, path)
 
 # ─────────────────────────────────────────────
 # 8. Save Artifacts
@@ -211,13 +210,12 @@ print(f"\n✅ Saved: {metrics_path}")
 
 # metadata.pkl — consumed by BulkPredictionView + SinglePredictionView at inference
 metadata_path = os.path.join(MODELS_DIR, "metadata.pkl")
-with open(metadata_path, "wb") as f:
-    pickle.dump({
-        "scaler":        scaler,
-        "numeric_cols":  num_cols,
-        "cat_cols":      cat_cols,
-        "feature_names": X_encoded.columns.tolist(),
-    }, f)
+joblib.dump({
+    "scaler":        scaler,
+    "numeric_cols":  num_cols,
+    "cat_cols":      cat_cols,
+    "feature_names": X_encoded.columns.tolist(),
+}, metadata_path)
 print(f"✅ Saved: {metadata_path}")
 
 print("\n" + "=" * 60)
