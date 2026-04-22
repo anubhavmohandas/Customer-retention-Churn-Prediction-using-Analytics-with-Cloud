@@ -62,14 +62,24 @@ Most churn prediction projects are Jupyter notebooks. **This is a production app
 - Export high-risk customer list as CSV for your retention team
 
 ### 🔐 Security — Production Grade
+
+**Authentication**
 - **2FA via Email OTP** — every login triggers a 6-digit code sent to the user's inbox. Expires in 10 minutes.
 - **Forgot Password** — UUID token-based reset link. Expires in 1 hour. Immune to email enumeration.
-- **SMOTE + joblib** — no arbitrary code execution on model load (unlike pickle)
-- **CSRF protection** on all API endpoints
-- **Rate limiting** — 3 training requests per hour per user
+- **OTP brute force protection** — verification endpoint locks after 5 wrong attempts per IP for 15 minutes
+- **Constant-time OTP comparison** — `constant_time_compare()` prevents timing attacks that could leak code correctness
+- **Token invalidation** — old OTPs and reset tokens are immediately invalidated when a new one is requested. No stale valid tokens.
+- **Atomic OTP login** — OTP mark-used and session login wrapped in `transaction.atomic()` to prevent race conditions
+- **Resend rate limiting** — max 3 OTP resends per IP per 15 minutes to prevent inbox flooding
+
+**API & Infrastructure**
+- **CSRF protection** on all endpoints via Django middleware
+- **Rate limiting** — 3 model training requests per hour per user
 - **DB indexes** on all foreign keys for query performance
-- **HSTS, SSL redirect, X-Frame-Options DENY, Content-Type nosniff** in production
-- **Session + CSRF cookies** — Secure, HttpOnly in production
+- **joblib model serialization** — no arbitrary code execution on model load (unlike pickle)
+- **HSTS, SSL redirect, X-Frame-Options DENY, Content-Type nosniff** enforced in production
+- **Secure session + CSRF cookies** in production
+- **SECRET_KEY** loaded from environment — never hardcoded
 
 ### ☁️ Cloud Deployment
 - **AWS EC2** — Ubuntu 22.04, systemd-managed gunicorn service
