@@ -105,7 +105,10 @@ function resetUpload() {
  */
 
 function getCsrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    // Read from cookie (CSRF_COOKIE_HTTPONLY must be False for this to work)
+    const name = 'csrftoken';
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith(name + '='));
+    return cookie ? decodeURIComponent(cookie.trim().substring(name.length + 1)) : '';
 }
 
 // 1. Single Subscriber Simulation

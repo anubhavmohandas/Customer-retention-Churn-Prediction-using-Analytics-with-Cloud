@@ -180,7 +180,7 @@ RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Retain.Ai <onboarding@r
 # Security hardening (only tightened when DEBUG=False)
 # ---------------------------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Must be False — JS reads this for API CSRF tokens
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
