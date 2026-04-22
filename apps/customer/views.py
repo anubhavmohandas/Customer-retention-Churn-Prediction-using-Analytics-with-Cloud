@@ -106,7 +106,8 @@ def login_view(request):
             if user is not None:
                 cache.delete(cache_key)  # Reset attempts on success
 
-                # Generate 6-digit OTP and send via Resend
+                # Invalidate any existing unused OTPs before creating new one
+                OTPCode.objects.filter(user=user, is_used=False).update(is_used=True)
                 otp_code = f"{secrets.randbelow(1000000):06d}"
                 OTPCode.objects.create(user=user, code=otp_code)
                 send_otp_email(user.email, otp_code, user.first_name)
@@ -808,6 +809,14 @@ def otp_verify_page(request):
         if not user_id:
             return JsonResponse({"error": "Session expired. Please login again."}, status=400)
 
+        # Rate limit OTP verify — 5 attempts per IP per 15 minutes
+        ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+              or request.META.get('REMOTE_ADDR', ''))
+        rate_key = f"otp_verify_{ip}"
+        attempts = cache.get(rate_key, 0)
+        if attempts >= 5:
+            return JsonResponse({"error": "Too many attempts. Please wait 15 minutes."}, status=429)
+
         entered_code = request.POST.get('otp', '').strip()
 
         try:
@@ -819,17 +828,22 @@ def otp_verify_page(request):
         otp_obj = OTPCode.objects.filter(user=user, is_used=False).order_by('-created_at').first()
 
         if not otp_obj or not otp_obj.is_valid():
-            return JsonResponse({"error": "OTP expired. Please login again to get a new code."}, status=400)
+            return JsonResponse({"error": "Invalid or expired code. Please login again."}, status=400)
 
-        if otp_obj.code != entered_code:
-            return JsonResponse({"error": "Incorrect code. Please try again."}, status=400)
+        # Constant-time comparison to prevent timing attacks
+        from django.utils.crypto import constant_time_compare
+        if not constant_time_compare(otp_obj.code, entered_code):
+            cache.set(rate_key, attempts + 1, 900)
+            return JsonResponse({"error": "Invalid or expired code. Please try again."}, status=400)
 
-        # Valid — mark used, log the user in
-        otp_obj.is_used = True
-        otp_obj.save()
+        # Valid — mark used and log the user in atomically
+        with transaction.atomic():
+            otp_obj.is_used = True
+            otp_obj.save()
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        cache.delete(rate_key)
         del request.session['pending_2fa_user_id']
-
-        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         return JsonResponse({"message": "Login successful", "redirect": "/dashboard/"}, status=200)
 
 
@@ -844,9 +858,19 @@ def resend_otp(request):
     except Customer.DoesNotExist:
         return JsonResponse({"error": "Invalid session."}, status=400)
 
+    # Rate limit resend — 3 requests per IP per 15 minutes
+    ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+          or request.META.get('REMOTE_ADDR', ''))
+    rate_key = f"resend_otp_{ip}"
+    if cache.get(rate_key, 0) >= 3:
+        return JsonResponse({"error": "Too many resend requests. Please wait."}, status=429)
+
+    # Invalidate old OTPs, create fresh one
+    OTPCode.objects.filter(user=user, is_used=False).update(is_used=True)
     otp_code = f"{secrets.randbelow(1000000):06d}"
     OTPCode.objects.create(user=user, code=otp_code)
     send_otp_email(user.email, otp_code, user.first_name)
+    cache.set(rate_key, cache.get(rate_key, 0) + 1, 900)
     return JsonResponse({"message": "New code sent."}, status=200)
 
 
@@ -861,6 +885,8 @@ def password_reset_request(request):
     email = request.POST.get('email', '').strip().lower()
     try:
         user = Customer.objects.get(email=email)
+        # Invalidate any existing unused reset tokens before creating new one
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
         token_obj = PasswordResetToken.objects.create(user=user)
         reset_url = request.build_absolute_uri(f"/accounts/password-reset/confirm/{token_obj.token}/")
         send_password_reset_email(user.email, reset_url, user.first_name)
