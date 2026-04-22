@@ -34,8 +34,10 @@ from rest_framework.authentication import SessionAuthentication
 from django.utils import timezone
 from django.core.cache import cache
 from django.contrib.auth import update_session_auth_hash
-from .models import Customer, PredictionReport, ReportHistory, ActivityLog
+from .models import Customer, PredictionReport, ReportHistory, ActivityLog, OTPCode, PasswordResetToken
+from .resend_utils import send_otp_email, send_password_reset_email
 import csv
+import secrets
 
 # Risk threshold constants
 RISK_HIGH = 0.7
@@ -103,11 +105,18 @@ def login_view(request):
 
             if user is not None:
                 cache.delete(cache_key)  # Reset attempts on success
-                login(request, user)
+
+                # Generate 6-digit OTP and send via Resend
+                otp_code = f"{secrets.randbelow(1000000):06d}"
+                OTPCode.objects.create(user=user, code=otp_code)
+                send_otp_email(user.email, otp_code, user.first_name)
+
+                # Store pending user in session (not logged in yet)
+                request.session['pending_2fa_user_id'] = user.id
+
                 return JsonResponse({
-                    "message": "Login successful",
-                    "user_id": user.id,
-                    "full_name": f"{user.first_name} {user.last_name}"
+                    "requires_otp": True,
+                    "redirect": "/accounts/verify-otp/"
                 }, status=200)
 
             cache.set(cache_key, attempts + 1, 900)  # 900s = 15 minutes
@@ -782,3 +791,113 @@ class TrainCustomModelView(APIView):
         except Exception as e:
             logger.exception("Auto-train failed")
             return Response({"error": str(e)}, status=500)
+
+
+# ==========================================
+# 2FA OTP VERIFY
+# ==========================================
+
+def otp_verify_page(request):
+    if request.method == 'GET':
+        if 'pending_2fa_user_id' not in request.session:
+            return redirect('login')
+        return render(request, 'otp_verify.html')
+
+    if request.method == 'POST':
+        user_id = request.session.get('pending_2fa_user_id')
+        if not user_id:
+            return JsonResponse({"error": "Session expired. Please login again."}, status=400)
+
+        entered_code = request.POST.get('otp', '').strip()
+
+        try:
+            user = Customer.objects.get(id=user_id)
+        except Customer.DoesNotExist:
+            return JsonResponse({"error": "Invalid session."}, status=400)
+
+        # Find latest valid OTP for this user
+        otp_obj = OTPCode.objects.filter(user=user, is_used=False).order_by('-created_at').first()
+
+        if not otp_obj or not otp_obj.is_valid():
+            return JsonResponse({"error": "OTP expired. Please login again to get a new code."}, status=400)
+
+        if otp_obj.code != entered_code:
+            return JsonResponse({"error": "Incorrect code. Please try again."}, status=400)
+
+        # Valid — mark used, log the user in
+        otp_obj.is_used = True
+        otp_obj.save()
+        del request.session['pending_2fa_user_id']
+
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        return JsonResponse({"message": "Login successful", "redirect": "/dashboard/"}, status=200)
+
+
+def resend_otp(request):
+    """Resend a fresh OTP to the pending user."""
+    user_id = request.session.get('pending_2fa_user_id')
+    if not user_id:
+        return JsonResponse({"error": "Session expired."}, status=400)
+
+    try:
+        user = Customer.objects.get(id=user_id)
+    except Customer.DoesNotExist:
+        return JsonResponse({"error": "Invalid session."}, status=400)
+
+    otp_code = f"{secrets.randbelow(1000000):06d}"
+    OTPCode.objects.create(user=user, code=otp_code)
+    send_otp_email(user.email, otp_code, user.first_name)
+    return JsonResponse({"message": "New code sent."}, status=200)
+
+
+# ==========================================
+# PASSWORD RESET
+# ==========================================
+
+def password_reset_request(request):
+    if request.method == 'GET':
+        return render(request, 'password_reset_request.html')
+
+    email = request.POST.get('email', '').strip().lower()
+    try:
+        user = Customer.objects.get(email=email)
+        token_obj = PasswordResetToken.objects.create(user=user)
+        reset_url = request.build_absolute_uri(f"/accounts/password-reset/confirm/{token_obj.token}/")
+        send_password_reset_email(user.email, reset_url, user.first_name)
+    except Customer.DoesNotExist:
+        pass  # Don't reveal whether email exists
+
+    # Always show the same page to prevent email enumeration
+    return render(request, 'password_reset_sent.html', {'email': email})
+
+
+def password_reset_confirm(request, token):
+    try:
+        token_obj = PasswordResetToken.objects.get(token=token)
+    except PasswordResetToken.DoesNotExist:
+        return render(request, 'password_reset_confirm.html', {'error': 'Invalid or expired link.'})
+
+    if not token_obj.is_valid():
+        return render(request, 'password_reset_confirm.html', {'error': 'This link has expired. Please request a new one.'})
+
+    if request.method == 'GET':
+        return render(request, 'password_reset_confirm.html', {'token': token})
+
+    new_password = request.POST.get('new_password', '')
+    confirm_password = request.POST.get('confirm_password', '')
+
+    if new_password != confirm_password:
+        return render(request, 'password_reset_confirm.html', {'token': token, 'error': 'Passwords do not match.'})
+
+    try:
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(new_password, token_obj.user)
+    except ValidationError as e:
+        return render(request, 'password_reset_confirm.html', {'token': token, 'error': ' '.join(e.messages)})
+
+    token_obj.user.set_password(new_password)
+    token_obj.user.save()
+    token_obj.is_used = True
+    token_obj.save()
+
+    return render(request, 'password_reset_confirm.html', {'success': True})

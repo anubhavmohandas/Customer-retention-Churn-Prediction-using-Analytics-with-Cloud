@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
@@ -151,4 +152,40 @@ class ReportHistory(models.Model):
         """Delete records older than 30 days."""
         thirty_days_ago = timezone.now() - timedelta(days=30)
         ReportHistory.objects.filter(created_at__lt=thirty_days_ago).delete()
+
+
+class OTPCode(models.Model):
+    """6-digit OTP for 2FA login verification. Expires in 10 minutes."""
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='otp_codes')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self):
+        expiry = self.created_at + timedelta(minutes=10)
+        return not self.is_used and timezone.now() < expiry
+
+    def __str__(self):
+        return f"OTP for {self.user.email} — {'used' if self.is_used else 'active'}"
+
+
+class PasswordResetToken(models.Model):
+    """Secure UUID token for password reset. Expires in 1 hour."""
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='reset_tokens')
+    token = models.UUIDField(default=uuid.uuid4, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self):
+        expiry = self.created_at + timedelta(hours=1)
+        return not self.is_used and timezone.now() < expiry
+
+    def __str__(self):
+        return f"Reset token for {self.user.email} — {'used' if self.is_used else 'active'}"
 

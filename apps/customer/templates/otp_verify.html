@@ -1,0 +1,137 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Retain.Ai — Verify Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.5s ease-out forwards; opacity: 0; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center p-6">
+
+    <div class="w-full max-w-[440px] bg-white dark:bg-[#141414] rounded-3xl shadow-2xl p-8 md:p-12 border border-gray-100 dark:border-zinc-800 animate-fade-up">
+
+        <div class="flex flex-col items-center mb-10 text-center">
+            <a href="/" class="w-12 h-12 bg-black dark:bg-white rounded-2xl flex items-center justify-center rotate-3 mb-6 hover:scale-105 transition-transform">
+                <div class="w-5 h-5 bg-white dark:bg-black rounded-full"></div>
+            </a>
+            <div class="inline-flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Two-Factor Authentication</div>
+            <h1 class="text-3xl font-extrabold tracking-tight dark:text-white mb-2">Check your email</h1>
+            <p class="text-gray-500 dark:text-zinc-400 text-sm">We sent a 6-digit code to your email. It expires in 10 minutes.</p>
+        </div>
+
+        <div id="errorBanner" class="hidden bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm font-semibold mb-6">
+            <span id="errorText">Invalid code. Please try again.</span>
+        </div>
+
+        <form id="otpForm" method="POST">
+            {% csrf_token %}
+            <div class="mb-6">
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">6-Digit Code</label>
+                <input type="number" name="otp" id="otpInput" maxlength="6"
+                       placeholder="000000"
+                       class="w-full text-center text-4xl font-black tracking-[0.3em] bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white rounded-2xl py-5 px-4 focus:ring-2 focus:ring-black dark:focus:ring-white outline-none transition"
+                       autocomplete="one-time-code" autofocus>
+            </div>
+
+            <button type="submit" id="submitBtn"
+                    class="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-2xl font-extrabold text-sm uppercase tracking-widest hover:scale-[0.98] active:scale-95 transition-all mb-4">
+                Verify Code
+            </button>
+        </form>
+
+        <button onclick="resendOTP()" id="resendBtn"
+                class="w-full text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition">
+            Resend Code
+        </button>
+
+        <div class="text-center mt-6">
+            <a href="/accounts/login/" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition">
+                ← Back to Login
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        function getCookie(name) {
+            let v = null;
+            document.cookie.split(';').forEach(c => {
+                c = c.trim();
+                if (c.startsWith(name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
+            });
+            return v;
+        }
+
+        document.getElementById('otpForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const otp = document.getElementById('otpInput').value.trim();
+            const btn = document.getElementById('submitBtn');
+            const errorBanner = document.getElementById('errorBanner');
+
+            if (otp.length !== 6) {
+                document.getElementById('errorText').innerText = 'Please enter the 6-digit code.';
+                errorBanner.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            errorBanner.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('otp', otp);
+            formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+
+            try {
+                const res = await fetch('/accounts/verify-otp/', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    window.location.href = data.redirect || '/dashboard/';
+                } else {
+                    document.getElementById('errorText').innerText = data.error || 'Invalid code.';
+                    errorBanner.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.textContent = 'Verify Code';
+                }
+            } catch {
+                document.getElementById('errorText').innerText = 'Something went wrong. Try again.';
+                errorBanner.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Verify Code';
+            }
+        });
+
+        async function resendOTP() {
+            const btn = document.getElementById('resendBtn');
+            btn.textContent = 'Sending...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/resend-otp/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                const data = await res.json();
+                btn.textContent = res.ok ? 'Code sent!' : 'Failed. Try again.';
+                setTimeout(() => { btn.textContent = 'Resend Code'; btn.disabled = false; }, 3000);
+            } catch {
+                btn.textContent = 'Failed. Try again.';
+                setTimeout(() => { btn.textContent = 'Resend Code'; btn.disabled = false; }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

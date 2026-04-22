@@ -171,6 +171,12 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ---------------------------------------------------------------------------
+# Resend Email (replace re_xxxxxxxxx with your real key from resend.com)
+# ---------------------------------------------------------------------------
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_xxxxxxxxx')
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Retain.Ai <onboarding@resend.dev>')
+
+# ---------------------------------------------------------------------------
 # Security hardening (only tightened when DEBUG=False)
 # ---------------------------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True

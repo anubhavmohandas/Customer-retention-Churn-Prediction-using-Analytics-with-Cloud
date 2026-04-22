@@ -11,7 +11,9 @@ from apps.customer.views import (
     prediction_page,
     report_history_page,
     risk_analysis_page, export_risk_list, ai_models_page, settings_page,
-    TrainCustomModelView
+    TrainCustomModelView,
+    otp_verify_page, resend_otp,
+    password_reset_request, password_reset_confirm
 )
 
 urlpatterns = [
@@ -32,6 +34,12 @@ urlpatterns = [
     path('ai-models/', ai_models_page, name='ai_models_page'),
     path('settings/', settings_page, name='settings_page'),
 
+
+    # --- 2FA & Password Reset ---
+    path('accounts/verify-otp/', otp_verify_page, name='verify_otp'),
+    path('api/resend-otp/', resend_otp, name='resend_otp'),
+    path('accounts/password-reset/', password_reset_request, name='password_reset'),
+    path('accounts/password-reset/confirm/<uuid:token>/', password_reset_confirm, name='password_reset_confirm'),
 
     # --- AI Prediction APIs ---
     path('api/predict-single/', SinglePredictionView.as_view(), name='predict_single'),

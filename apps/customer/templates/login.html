@@ -236,8 +236,12 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // ✅ SUCCESS
-                    window.location.href = '/dashboard/'; // change to dashboard if needed
+                    // ✅ SUCCESS — check if 2FA OTP is required
+                    if (data.requires_otp) {
+                        window.location.href = data.redirect;
+                    } else {
+                        window.location.href = '/dashboard/';
+                    }
                 } else {
                     // ❌ ERROR FROM DJANGO
                     document.getElementById('formErrorText').innerText = data.error || "Invalid email or password.";
