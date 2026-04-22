@@ -11,6 +11,7 @@ gunicorn==23.0.0
 whitenoise==6.8.2
 python-dotenv==1.0.1
 psycopg2-binary==2.9.10
+resend>=2.0.0
 
 # --- ML / data (kept at your pinned versions so .pkl files load cleanly) ---
 imbalanced-learn==0.14.1
