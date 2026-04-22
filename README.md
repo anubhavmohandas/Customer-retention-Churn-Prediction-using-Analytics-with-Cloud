@@ -248,8 +248,9 @@ Built with 🔥 as a college capstone project.
 
 | Name | Role |
 |---|---|
-| Anubhav Mohandas | Full Stack + ML + DevOps |
-| *your teammates* | *their roles* |
+| **Vishv** | Backend architecture, Django setup, ML model training (LR + RF + XGBoost) |
+| **Anubhav Mohandas** | Security hardening, cloud deployment (EC2 + HTTPS), full refactor, 2FA + email integration, API fixes, DevOps |
+| **Khushang** | Initial Streamlit prototype, documentation, project reporting |
 
 ---
 
