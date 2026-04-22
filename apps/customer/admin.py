@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from apps.customer.models import Customer, PredictionReport, ReportHistory, LoginHistory, ActivityLog
 
 
@@ -48,8 +50,38 @@ class ActivityLogAdmin(admin.ModelAdmin):
         return obj.attempted_email or '—'
 
 
-# ── Existing models ───────────────────────────────────────────────────────────
+# ── Customer (User) Admin ─────────────────────────────────────────────────────
 
-admin.site.register(Customer)
+@admin.register(Customer)
+class CustomerAdmin(UserAdmin):
+    # Use Django's built-in user forms — handles password hashing correctly
+    add_form = UserCreationForm
+    form = UserChangeForm
+    model = Customer
+
+    list_display = ('email', 'first_name', 'last_name', 'is_staff', 'is_superuser', 'is_active', 'date_joined')
+    list_filter = ('is_staff', 'is_superuser', 'is_active')
+    search_fields = ('email', 'first_name', 'last_name')
+    ordering = ('-date_joined',)
+
+    # Fields shown when EDITING an existing user
+    fieldsets = (
+        (None,               {'fields': ('email', 'password')}),
+        ('Personal Info',    {'fields': ('first_name', 'last_name')}),
+        ('Permissions',      {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Important Dates',  {'fields': ('last_login', 'date_joined')}),
+    )
+
+    # Fields shown when CREATING a new user
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'first_name', 'last_name', 'password1', 'password2', 'is_staff', 'is_superuser', 'is_active'),
+        }),
+    )
+
+
+# ── Prediction Models ─────────────────────────────────────────────────────────
+
 admin.site.register(PredictionReport)
 admin.site.register(ReportHistory)
