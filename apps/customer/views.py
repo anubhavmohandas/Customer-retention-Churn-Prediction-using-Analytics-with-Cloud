@@ -1,8 +1,9 @@
 import logging
 import os
-import pickle
+import joblib
 import random
 import json
+import math
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -18,7 +19,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Avg, Sum
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings
@@ -35,6 +36,10 @@ from django.core.cache import cache
 from django.contrib.auth import update_session_auth_hash
 from .models import Customer, PredictionReport, ReportHistory, ActivityLog
 import csv
+
+# Risk threshold constants
+RISK_HIGH = 0.7
+RISK_MEDIUM = 0.3
 
 # --- AUTH VIEWS ---
 
@@ -119,8 +124,8 @@ def login_view(request):
 def dashboard_page(request):
     user_reports = PredictionReport.objects.filter(user=request.user)
 
-    high_risk_count = user_reports.filter(risk_score__gte=0.7).count()
-    mrr_at_risk = (user_reports.filter(risk_score__gte=0.7).aggregate(Sum('monthly_charges'))[
+    high_risk_count = user_reports.filter(risk_score__gte=RISK_HIGH).count()
+    mrr_at_risk = (user_reports.filter(risk_score__gte=RISK_HIGH).aggregate(Sum('monthly_charges'))[
                        'monthly_charges__sum'] or 0) / 1000
 
     raw_contract_stats = user_reports.values('contract_type').annotate(
@@ -133,7 +138,7 @@ def dashboard_page(request):
         contract_stats.append({
             'contract_type': item['contract_type'],
             'risk_percent': round(risk_val * 100),
-            'color': 'red-500' if risk_val >= 0.7 else 'yellow-500' if risk_val >= 0.3 else 'emerald-500'
+            'color': 'red-500' if risk_val >= RISK_HIGH else 'yellow-500' if risk_val >= RISK_MEDIUM else 'emerald-500'
         })
 
     context = {
@@ -141,7 +146,7 @@ def dashboard_page(request):
         'mrr_at_risk': mrr_at_risk,
         'potential_recovery': mrr_at_risk * 0.2,
         'contract_stats': contract_stats,
-        'priority_queue': user_reports.filter(risk_score__gte=0.7).order_by('-monthly_charges')[:5],
+        'priority_queue': user_reports.filter(risk_score__gte=RISK_HIGH).order_by('-monthly_charges')[:5],
         'total_predictions': user_reports.aggregate(t=Sum('record_count'))['t'] or 0,
     }
     return render(request, 'dashboard.html', context)
@@ -183,8 +188,7 @@ class BulkPredictionView(APIView):
 
             # 2. Load Assets
             # (model loaded later — either single or ensemble)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
-                meta = pickle.load(f)
+            meta = joblib.load(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'))
 
             # 3. Process Data
             df = pd.read_csv(file_obj)
@@ -223,8 +227,7 @@ class BulkPredictionView(APIView):
                 for fname in model_map.values():
                     p = os.path.join(settings.BASE_DIR, 'models', fname)
                     if os.path.exists(p):
-                        with open(p, 'rb') as f:
-                            all_probs.append(pickle.load(f).predict_proba(df_encoded)[:, 1])
+                        all_probs.append(joblib.load(p).predict_proba(df_encoded)[:, 1])
                 predictions = np.mean(all_probs, axis=0) if all_probs else np.zeros(len(df_encoded))
                 final_model_name = 'ensemble_stack'
             else:
@@ -233,63 +236,69 @@ class BulkPredictionView(APIView):
                 if not os.path.exists(model_path):
                     model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
                     final_model_name = 'random_forest'
-                with open(model_path, 'rb') as f:
-                    model = pickle.load(f)
+                model = joblib.load(model_path)
                 predictions = model.predict_proba(df_encoded)[:, 1]
             avg_risk = float(predictions.mean())
-            high_risk_count = int((predictions > 0.7).sum())
+            high_risk_count = int((predictions > RISK_HIGH).sum())
 
             # 5. Save snapshot, then trim bulk records to last 10
-            PredictionReport.objects.create(
-                user=request.user,
-                subscriber_id=f"BATCH-{random.randint(100, 999)}",
-                source_file=file_obj.name,
-                record_count=len(df),
-                tenure=int(orig_df['tenure'].mean()) if 'tenure' in orig_df.columns else 0,
-                monthly_charges=float(orig_df['MonthlyCharges'].mean()) if 'MonthlyCharges' in orig_df.columns else 0.0,
-                contract_type="Bulk Upload",
-                risk_score=avg_risk,
-                model_version=final_model_name
-            )
+            # Handle NaN protection for tenure and monthly_charges
+            tenure_val = orig_df['tenure'].mean() if 'tenure' in orig_df.columns else 0
+            tenure_val = 0 if math.isnan(tenure_val) else int(tenure_val)
+            charges_val = orig_df['MonthlyCharges'].mean() if 'MonthlyCharges' in orig_df.columns else 0.0
+            charges_val = 0.0 if math.isnan(charges_val) else float(charges_val)
 
-            # Trim bulk PredictionReport records to last 10 (keep Single Analysis untouched)
-            bulk_qs = PredictionReport.objects.filter(
-                user=request.user
-            ).exclude(source_file="Single Analysis").order_by('-created_at')
-            excess_ids = list(bulk_qs.values_list('id', flat=True)[10:])
-            if excess_ids:
-                PredictionReport.objects.filter(id__in=excess_ids).delete()
-
-            # 6. Save to permanent ReportHistory
-            ReportHistory.objects.create(
-                user=request.user,
-                batch_name=f"Batch_{timezone.now().strftime('%b_%d_%H%M')}",
-                source_file=file_obj.name,
-                total_records=len(df),
-                avg_risk_score=avg_risk,
-                critical_count=high_risk_count,
-                model_version=final_model_name
-            )
-
-            # 7. Audit log
-            try:
-                from apps.customer.models import ActivityLog
-                ActivityLog.objects.create(
+            with transaction.atomic():
+                PredictionReport.objects.create(
                     user=request.user,
-                    action='BULK_PREDICT',
-                    ip_address=request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
-                                or request.META.get('REMOTE_ADDR'),
-                    detail=f"{len(predictions)} records processed from '{file_obj.name}' using {final_model_name}",
+                    subscriber_id=f"BATCH-{random.randint(100, 999)}",
+                    source_file=file_obj.name,
+                    record_count=len(df),
+                    tenure=tenure_val,
+                    monthly_charges=charges_val,
+                    contract_type="Bulk Upload",
+                    risk_score=avg_risk,
+                    model_version=final_model_name
                 )
-            except Exception:
-                logger.exception("Failed to log bulk prediction activity")
+
+                # Trim bulk PredictionReport records to last 10 (keep Single Analysis untouched)
+                bulk_qs = PredictionReport.objects.filter(
+                    user=request.user
+                ).exclude(source_file="Single Analysis").order_by('-created_at')
+                excess_ids = list(bulk_qs.values_list('id', flat=True)[10:])
+                if excess_ids:
+                    PredictionReport.objects.filter(id__in=excess_ids).delete()
+
+                # 6. Save to permanent ReportHistory
+                ReportHistory.objects.create(
+                    user=request.user,
+                    batch_name=f"Batch_{timezone.now().strftime('%b_%d_%H%M')}",
+                    source_file=file_obj.name,
+                    total_records=len(df),
+                    avg_risk_score=avg_risk,
+                    critical_count=high_risk_count,
+                    model_version=final_model_name
+                )
+
+                # 7. Audit log
+                try:
+                    from apps.customer.models import ActivityLog
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action='BULK_PREDICT',
+                        ip_address=request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+                                    or request.META.get('REMOTE_ADDR'),
+                        detail=f"{len(predictions)} records processed from '{file_obj.name}' using {final_model_name}",
+                    )
+                except Exception:
+                    logger.exception("Failed to log bulk prediction activity")
 
             return Response({
                 "avg_risk": round(avg_risk * 100, 2),
                 "total_processed": len(predictions),
                 "high_risk_count": high_risk_count,
-                "med_risk_count": int(((predictions <= 0.7) & (predictions > 0.3)).sum()),
-                "low_risk_count": int((predictions <= 0.3).sum()),
+                "med_risk_count": int(((predictions <= RISK_HIGH) & (predictions > RISK_MEDIUM)).sum()),
+                "low_risk_count": int((predictions <= RISK_MEDIUM).sum()),
             })
         except Exception:
             logger.exception("Bulk prediction failed")
@@ -309,8 +318,7 @@ class SinglePredictionView(APIView):
             save_to_history = str(save_val).lower() == 'true' or save_val is True
 
             # Load metadata (scaler + feature names)
-            with open(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'), 'rb') as f:
-                meta = pickle.load(f)
+            meta = joblib.load(os.path.join(settings.BASE_DIR, 'models', 'metadata.pkl'))
 
             scaler = meta["scaler"]
             numeric_cols = meta["numeric_cols"]
@@ -341,9 +349,8 @@ class SinglePredictionView(APIView):
                 for m_file in model_files:
                     path = os.path.join(settings.BASE_DIR, 'models', m_file)
                     if os.path.exists(path):
-                        with open(path, 'rb') as f:
-                            m_obj = pickle.load(f)
-                            probs.append(float(m_obj.predict_proba(df_input)[0, 1]))
+                        m_obj = joblib.load(path)
+                        probs.append(float(m_obj.predict_proba(df_input)[0, 1]))
                 prob = sum(probs) / len(probs) if probs else 0.0
                 final_model_name = "Ensemble Stack"
             else:
@@ -356,8 +363,7 @@ class SinglePredictionView(APIView):
                 model_path = os.path.join(settings.BASE_DIR, 'models', model_filename)
                 if not os.path.exists(model_path):
                     model_path = os.path.join(settings.BASE_DIR, 'models', 'random_forest_model.pkl')
-                with open(model_path, 'rb') as f:
-                    model_obj = pickle.load(f)
+                model_obj = joblib.load(model_path)
                 prob = float(model_obj.predict_proba(df_input)[0, 1])
                 final_model_name = requested_model.replace('_', ' ').title()
 
@@ -379,32 +385,33 @@ class SinglePredictionView(APIView):
                 logger.exception("Could not load metrics for confidence score")
 
             # Save live prediction (replace previous single analysis)
-            PredictionReport.objects.filter(
-                user=request.user, source_file="Single Analysis"
-            ).delete()
-            PredictionReport.objects.create(
-                user=request.user,
-                subscriber_id=f"SUB-{random.randint(1000, 9999)}",
-                source_file="Single Analysis",
-                record_count=1,
-                tenure=int(tenure),
-                monthly_charges=monthly_charges,
-                contract_type=contract,
-                risk_score=prob,
-                model_version=final_model_name
-            )
-
-            # Optionally save to permanent ReportHistory
-            if save_to_history:
-                ReportHistory.objects.create(
+            with transaction.atomic():
+                PredictionReport.objects.filter(
+                    user=request.user, source_file="Single Analysis"
+                ).delete()
+                PredictionReport.objects.create(
                     user=request.user,
-                    batch_name=f"Manual_Run_{timezone.now().strftime('%H%M%S')}",
-                    source_file="Manual Entry",
-                    total_records=1,
-                    avg_risk_score=prob,
-                    critical_count=1 if prob >= 0.7 else 0,
+                    subscriber_id=f"SUB-{random.randint(1000, 9999)}",
+                    source_file="Single Analysis",
+                    record_count=1,
+                    tenure=int(tenure),
+                    monthly_charges=monthly_charges,
+                    contract_type=contract,
+                    risk_score=prob,
                     model_version=final_model_name
                 )
+
+                # Optionally save to permanent ReportHistory
+                if save_to_history:
+                    ReportHistory.objects.create(
+                        user=request.user,
+                        batch_name=f"Manual_Run_{timezone.now().strftime('%H%M%S')}",
+                        source_file="Manual Entry",
+                        total_records=1,
+                        avg_risk_score=prob,
+                        critical_count=1 if prob >= RISK_HIGH else 0,
+                        model_version=final_model_name
+                    )
 
             return Response({
                 "probability": prob,
@@ -475,7 +482,7 @@ def risk_analysis_page(request):
     reports = PredictionReport.objects.filter(user=request.user)
 
     total_mrr = reports.aggregate(Sum('monthly_charges'))['monthly_charges__sum'] or 0
-    revenue_at_risk = reports.filter(risk_score__gte=0.7).aggregate(Sum('monthly_charges'))['monthly_charges__sum'] or 0
+    revenue_at_risk = reports.filter(risk_score__gte=RISK_HIGH).aggregate(Sum('monthly_charges'))['monthly_charges__sum'] or 0
 
     contract_stats = reports.values('contract_type').annotate(avg_risk=Avg('risk_score'))
     contract_labels = [item['contract_type'] for item in contract_stats]
@@ -509,7 +516,7 @@ def export_risk_list(request):
 
     critical_reports = PredictionReport.objects.filter(
         user=request.user,
-        risk_score__gte=0.7
+        risk_score__gte=RISK_HIGH
     )
 
     for report in critical_reports:
@@ -627,7 +634,11 @@ def settings_page(request):
             user.username = email
 
             if risk_threshold:
-                user.risk_threshold = int(risk_threshold)
+                threshold_val = int(risk_threshold)
+                if not 0 <= threshold_val <= 100:
+                    messages.error(request, "Risk threshold must be between 0 and 100.")
+                    return redirect('settings_page')
+                user.risk_threshold = threshold_val
 
             user.save()
             messages.success(request, "Your profile and AI preferences have been updated.")
@@ -655,6 +666,12 @@ class TrainCustomModelView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Rate limiting: max 3 training requests per user per hour
+        cache_key = f"train_attempts_{request.user.id}"
+        attempts = cache.get(cache_key, 0)
+        if attempts >= 3:
+            return Response({"error": "Training limit reached. Please wait before retraining."}, status=429)
+
         try:
             file_obj = request.FILES.get('file')
             if not file_obj:
@@ -728,8 +745,7 @@ class TrainCustomModelView(APIView):
                 idx = np.linspace(0, len(fpr) - 1, 6, dtype=int)
                 roc_points = [[round(float(fpr[i]), 3), round(float(tpr[i]), 3)] for i in idx]
 
-                with open(os.path.join(MODELS_DIR, f"{name}_model.pkl"), "wb") as f:
-                    pickle.dump(clf, f)
+                joblib.dump(clf, os.path.join(MODELS_DIR, f"{name}_model.pkl"))
 
                 json_metrics[name] = {
                     "accuracy":  round(acc * 100, 1),
@@ -743,12 +759,11 @@ class TrainCustomModelView(APIView):
             with open(os.path.join(MODELS_DIR, "metrics.json"), "w") as f:
                 json.dump(json_metrics, f, indent=2)
 
-            with open(os.path.join(MODELS_DIR, "metadata.pkl"), "wb") as f:
-                pickle.dump({
-                    "scaler": scaler,
-                    "numeric_cols": num_cols,
-                    "feature_names": feature_names,
-                }, f)
+            joblib.dump({
+                "scaler": scaler,
+                "numeric_cols": num_cols,
+                "feature_names": feature_names,
+            }, os.path.join(MODELS_DIR, "metadata.pkl"))
 
             try:
                 ActivityLog.objects.create(
@@ -758,6 +773,9 @@ class TrainCustomModelView(APIView):
                 )
             except Exception:
                 pass
+
+            # Increment rate limit counter on successful training
+            cache.set(cache_key, attempts + 1, 3600)  # 3600 seconds = 1 hour
 
             return Response({"message": "AutoML Training Complete!", "metrics": json_metrics})
 

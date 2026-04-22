@@ -29,12 +29,13 @@ def env_bool(name: str, default: bool = False) -> bool:
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-dev-only-replace-in-prod',
-)
-
 DEBUG = env_bool('DJANGO_DEBUG', default=False)
+
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if not DEBUG:
+        raise RuntimeError("DJANGO_SECRET_KEY environment variable must be set in production.")
+    SECRET_KEY = 'django-insecure-dev-only-replace-in-prod'
 
 ALLOWED_HOSTS = [
     h.strip()
@@ -172,6 +173,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ---------------------------------------------------------------------------
 # Security hardening (only tightened when DEBUG=False)
 # ---------------------------------------------------------------------------
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True

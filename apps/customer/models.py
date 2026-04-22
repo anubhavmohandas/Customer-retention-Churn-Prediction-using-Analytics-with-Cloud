@@ -31,7 +31,7 @@ class Customer(AbstractUser):
 class PredictionReport(models.Model):
     # Attribution: Linking to the Customer model
     # related_name='reports' allows you to do: request.user.reports.all()
-    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='reports', null=True)
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='reports', null=True, db_index=True)
 
     # Identification
     subscriber_id = models.CharField(max_length=50, default="SIM-AUTO", db_index=True)
@@ -77,7 +77,7 @@ class PredictionReport(models.Model):
 
 
 class LoginHistory(models.Model):
-    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='login_history')
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='login_history', db_index=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=500, blank=True)
@@ -103,7 +103,7 @@ class ActivityLog(models.Model):
     # Nullable — failed logins have no authenticated user
     user = models.ForeignKey(
         Customer, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='activity_log'
+        null=True, blank=True, related_name='activity_log', db_index=True
     )
     timestamp  = models.DateTimeField(auto_now_add=True)
     action     = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True)
@@ -123,7 +123,7 @@ class ActivityLog(models.Model):
 
 
 class ReportHistory(models.Model):
-    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='history_archives')
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='history_archives', db_index=True)
 
     # Store the core stats as a "Frozen" snapshot
     batch_name = models.CharField(max_length=100)  # e.g., "Batch_April_16"
