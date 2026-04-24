@@ -56,6 +56,9 @@ def log_user_logout(sender, request, user, **kwargs):
     from apps.customer.models import ActivityLog
     if user is None:
         return
+    # Skip logout log if this is part of an account deletion (already logged separately)
+    if request and request.session.get('_account_being_deleted'):
+        return
     try:
         ActivityLog.objects.create(
             user=user,

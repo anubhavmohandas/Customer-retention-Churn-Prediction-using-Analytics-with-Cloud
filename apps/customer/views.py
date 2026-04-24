@@ -670,7 +670,23 @@ def settings_page(request):
 @login_required(login_url='/accounts/login/')
 @require_POST
 def delete_account(request):
+    from apps.customer.models import ActivityLog
     user = request.user
+    email = user.email
+    ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+          or request.META.get('REMOTE_ADDR', ''))
+
+    # Log ACCOUNT_DELETED before deleting (user FK will be set null after delete)
+    ActivityLog.objects.create(
+        user=None,
+        action='ACCOUNT_DELETED',
+        ip_address=ip,
+        attempted_email=email,
+        detail=f"Account permanently deleted: {email}",
+    )
+
+    # Mark session so logout signal knows to skip duplicate logging
+    request.session['_account_being_deleted'] = True
     logout(request)
     user.delete()
     return redirect('/accounts/login/')

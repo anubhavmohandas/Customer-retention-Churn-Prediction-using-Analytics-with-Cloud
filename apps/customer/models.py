@@ -95,10 +95,11 @@ class LoginHistory(models.Model):
 
 class ActivityLog(models.Model):
     ACTION_CHOICES = [
-        ('LOGIN_FAILED',  'Failed Login Attempt'),
-        ('LOGOUT',        'Logout'),
-        ('BULK_PREDICT',  'Bulk Prediction Run'),
-        ('CSV_EXPORT',    'CSV Export / Download'),
+        ('LOGIN_FAILED',      'Failed Login Attempt'),
+        ('LOGOUT',            'Logout'),
+        ('ACCOUNT_DELETED',   'Account Deleted'),
+        ('BULK_PREDICT',      'Bulk Prediction Run'),
+        ('CSV_EXPORT',        'CSV Export / Download'),
     ]
 
     # Nullable — failed logins have no authenticated user
