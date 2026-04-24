@@ -33,7 +33,37 @@
     .c-warning  { color: #eab308; }
     .c-stable   { color: #10b981; }
 
-    @media print { .no-print { display: none !important; } }
+    @media print {
+      /* Hide sidebar, topbar, pagination, export button */
+      .no-print { display: none !important; }
+      aside, nav, header { display: none !important; }
+
+      /* Full width — remove sidebar offset */
+      body { display: block !important; background: white !important; }
+      .flex-1 { width: 100% !important; }
+      main { padding: 16px !important; }
+
+      /* Force landscape and fit to page */
+      @page { size: A4 landscape; margin: 12mm; }
+
+      /* Make table fit — no clipping */
+      .overflow-x-auto { overflow: visible !important; }
+      table { width: 100% !important; min-width: unset !important; font-size: 11px !important; }
+      th, td { padding: 8px 12px !important; }
+
+      /* Keep colors readable on paper */
+      .c-critical { color: #dc2626 !important; }
+      .c-warning  { color: #ca8a04 !important; }
+      .c-stable   { color: #059669 !important; }
+
+      /* Stat cards — 4 in a row */
+      .grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; margin-bottom: 16px !important; }
+      .rounded-\[24px\] { border-radius: 8px !important; padding: 12px !important; }
+      .text-4xl { font-size: 24px !important; }
+
+      /* No page break inside rows */
+      tr { page-break-inside: avoid; }
+    }
   </style>
 </head>
 
