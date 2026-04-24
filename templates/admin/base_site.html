@@ -18,9 +18,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="{% static 'admin/css/custom_admin.css' %}">
 <style>
-  .retain-signout-btn {
+  /* Style Django 6's built-in logout button */
+  #logout-form {
+    display: inline;
+  }
+  #logout-form button {
     background: #e53e3e;
-    color: #fff !important;
+    color: #fff;
     padding: 3px 12px;
     border-radius: 5px;
     font-weight: 600;
@@ -29,11 +33,13 @@
     cursor: pointer;
     font-size: 0.8125rem;
     font-family: inherit;
-    text-decoration: none;
-    vertical-align: middle;
   }
-  .retain-signout-btn:hover {
+  #logout-form button:hover {
     background: #c53030;
+  }
+  /* Hide Django 6's theme toggle button */
+  button.theme-toggle {
+    display: none !important;
   }
 </style>
 {% endblock %}
@@ -41,32 +47,10 @@
 {% block footer %}
 {{ block.super }}
 <script>
+  // Rename "Log out" to "Sign Out"
   document.addEventListener('DOMContentLoaded', function () {
-    var userTools = document.getElementById('user-tools');
-    if (!userTools) return;
-
-    // Get CSRF token from cookie
-    var csrfToken = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-
-    // Build a POST form that acts as the Sign Out button
-    var form = document.createElement('form');
-    form.method = 'post';
-    form.action = '/admin/logout/';
-    form.style.display = 'inline';
-
-    var csrf = document.createElement('input');
-    csrf.type = 'hidden';
-    csrf.name = 'csrfmiddlewaretoken';
-    csrf.value = csrfToken;
-
-    var btn = document.createElement('button');
-    btn.type = 'submit';
-    btn.textContent = 'Sign Out';
-    btn.className = 'retain-signout-btn';
-
-    form.appendChild(csrf);
-    form.appendChild(btn);
-    userTools.appendChild(form);
+    var btn = document.querySelector('#logout-form button');
+    if (btn) btn.textContent = 'Sign Out';
   });
 </script>
 {% endblock %}
