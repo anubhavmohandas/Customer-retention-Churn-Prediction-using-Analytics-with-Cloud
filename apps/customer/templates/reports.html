@@ -34,34 +34,45 @@
     .c-stable   { color: #10b981; }
 
     @media print {
-      /* Hide sidebar, topbar, pagination, export button */
-      .no-print { display: none !important; }
-      aside, nav, header { display: none !important; }
+      @page { size: A4 landscape; margin: 10mm; }
 
-      /* Full width — remove sidebar offset */
+      /* Hide everything except main content */
+      .no-print,
+      [class*="sidebar"],
+      [class*="topbar"],
+      [id*="sidebar"],
+      [id*="topbar"] { display: none !important; }
+
+      /* Target sidebar/topbar by their position in the flex layout */
+      body > div,
       body { display: block !important; background: white !important; }
-      .flex-1 { width: 100% !important; }
-      main { padding: 16px !important; }
 
-      /* Force landscape and fit to page */
-      @page { size: A4 landscape; margin: 12mm; }
+      /* Hide first child of body flex (the sidebar) */
+      body > div:first-child { display: none !important; }
 
-      /* Make table fit — no clipping */
-      .overflow-x-auto { overflow: visible !important; }
-      table { width: 100% !important; min-width: unset !important; font-size: 11px !important; }
-      th, td { padding: 8px 12px !important; }
+      /* Make the main content area full width */
+      .flex-1 { width: 100% !important; max-width: 100% !important; }
+      .flex { display: block !important; }
+      main { padding: 10px !important; width: 100% !important; }
 
-      /* Keep colors readable on paper */
-      .c-critical { color: #dc2626 !important; }
-      .c-warning  { color: #ca8a04 !important; }
-      .c-stable   { color: #059669 !important; }
+      /* Hide topbar (first child inside the flex-1 div) */
+      .flex-1 > div:first-child { display: none !important; }
 
-      /* Stat cards — 4 in a row */
-      .grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; margin-bottom: 16px !important; }
-      .rounded-\[24px\] { border-radius: 8px !important; padding: 12px !important; }
-      .text-4xl { font-size: 24px !important; }
+      /* Table — full width, no overflow clipping */
+      .overflow-x-auto { overflow: visible !important; width: 100% !important; }
+      table { width: 100% !important; min-width: unset !important; font-size: 11px !important; table-layout: fixed !important; }
+      th, td { padding: 6px 10px !important; word-break: break-word !important; }
 
-      /* No page break inside rows */
+      /* Stat cards in one row */
+      .grid { display: flex !important; flex-wrap: nowrap !important; gap: 6px !important; margin-bottom: 12px !important; }
+      .grid > div { flex: 1 !important; padding: 10px !important; border-radius: 8px !important; border: 1px solid #e5e7eb !important; }
+      .text-4xl { font-size: 20px !important; }
+
+      /* Colors */
+      .c-critical { color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .c-warning  { color: #ca8a04 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .c-stable   { color: #059669 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
       tr { page-break-inside: avoid; }
     }
   </style>
@@ -69,10 +80,10 @@
 
 <body class="flex min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
 
-  {% include 'sidebar.html' %}
+  <div class="no-print">{% include 'sidebar.html' %}</div>
 
   <div class="flex-1 flex flex-col min-w-0">
-    {% include 'topbar.html' %}
+    <div class="no-print">{% include 'topbar.html' %}</div>
 
     <main class="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto">
 
