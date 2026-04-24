@@ -75,18 +75,22 @@ a.theme-toggle,
   display: inline !important;
   visibility: visible !important;
   pointer-events: auto !important;
-  background: #e53e3e !important;
-  color: #fff !important;
-  padding: 3px 12px !important;
-  border-radius: 5px !important;
-  font-weight: 600 !important;
+  background: transparent !important;
+  color: rgba(249,250,251,0.75) !important;
+  padding: 4px 13px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
   margin-left: 8px !important;
-  border: none !important;
+  border: 1px solid rgba(249,250,251,0.2) !important;
   cursor: pointer !important;
-  font-size: 0.8125rem !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.01em !important;
+  transition: background 0.15s, color 0.15s, border-color 0.15s !important;
 }
 #logout-form button:hover {
-  background: #c53030 !important;
+  background: rgba(239,68,68,0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(239,68,68,0.4) !important;
 }
 
 /* ── FONTS ── */
