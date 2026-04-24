@@ -114,6 +114,8 @@ def login_view(request):
                 send_otp_email(user.email, otp_code, user.first_name)
 
                 # Store pending user in session (not logged in yet)
+                # cycle_key() regenerates the session ID to prevent session fixation attacks
+                request.session.cycle_key()
                 request.session['pending_2fa_user_id'] = user.id
 
                 return JsonResponse({
@@ -325,6 +327,18 @@ class SinglePredictionView(APIView):
             monthly_charges = float(request.data.get('monthly_charges', 0))
             contract = request.data.get('contract', 'Month-to-month')
             requested_model = request.data.get('model', 'random_forest')
+
+            # Bounds validation — prevent garbage inputs from silently producing bad predictions
+            if not (0 <= tenure <= 120):
+                return Response({"error": "Tenure must be between 0 and 120 months."}, status=400)
+            if not (0 <= monthly_charges <= 10000):
+                return Response({"error": "Monthly charges must be between 0 and 10,000."}, status=400)
+            valid_contracts = ['Month-to-month', 'One year', 'Two year']
+            if contract not in valid_contracts:
+                return Response({"error": f"Invalid contract type. Must be one of: {', '.join(valid_contracts)}"}, status=400)
+            valid_models = ['random_forest', 'xgboost', 'logistic_regression', 'ensemble_stack']
+            if requested_model not in valid_models:
+                requested_model = 'random_forest'
             save_val = request.data.get('save_to_history', False)
             save_to_history = str(save_val).lower() == 'true' or save_val is True
 
@@ -819,9 +833,9 @@ class TrainCustomModelView(APIView):
 
             return Response({"message": "AutoML Training Complete!", "metrics": json_metrics})
 
-        except Exception as e:
+        except Exception:
             logger.exception("Auto-train failed")
-            return Response({"error": str(e)}, status=500)
+            return Response({"error": "Training failed. Please check your dataset and try again."}, status=500)
 
 
 # ==========================================
@@ -854,6 +868,13 @@ def otp_verify_page(request):
         except Customer.DoesNotExist:
             return JsonResponse({"error": "Invalid session."}, status=400)
 
+        # Per-account lockout — 10 cumulative failures locks the account for 30 minutes
+        # This catches attackers rotating IPs to bypass the IP-based limit above
+        account_key = f"otp_account_{user.id}"
+        account_failures = cache.get(account_key, 0)
+        if account_failures >= 10:
+            return JsonResponse({"error": "Account temporarily locked. Please try again in 30 minutes."}, status=429)
+
         # Find latest valid OTP for this user
         otp_obj = OTPCode.objects.filter(user=user, is_used=False).order_by('-created_at').first()
 
@@ -864,6 +885,7 @@ def otp_verify_page(request):
         from django.utils.crypto import constant_time_compare
         if not constant_time_compare(otp_obj.code, entered_code):
             cache.set(rate_key, attempts + 1, 900)
+            cache.set(account_key, account_failures + 1, 1800)  # 30-minute window per account
             return JsonResponse({"error": "Invalid or expired code. Please try again."}, status=400)
 
         # Valid — mark used and log the user in atomically
@@ -873,6 +895,7 @@ def otp_verify_page(request):
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
         cache.delete(rate_key)
+        cache.delete(f"otp_account_{user.id}")  # Clear account lockout on successful login
         del request.session['pending_2fa_user_id']
         return JsonResponse({"message": "Login successful", "redirect": "/dashboard/"}, status=200)
 
