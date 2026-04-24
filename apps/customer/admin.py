@@ -3,6 +3,10 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from apps.customer.models import Customer, PredictionReport, ReportHistory, LoginHistory, ActivityLog
 
+admin.site.site_title = "Retain.Ai"
+admin.site.site_header = "Retain.Ai Admin Portal"
+admin.site.index_title = "Welcome to Retain.Ai Analytics"
+
 
 # ── LoginHistory ─────────────────────────────────────────────────────────────
 
