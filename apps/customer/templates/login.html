@@ -31,7 +31,6 @@
             letter-spacing: -0.01em;
         }
 
-        /* ── ANIMATIONS ── */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -40,11 +39,9 @@
         .delay-100 { animation-delay: 100ms; }
         .delay-200 { animation-delay: 200ms; }
 
-        /* Custom Input Overrides */
         input:focus ~ .input-icon-svg { color: #000; }
         .dark input:focus ~ .input-icon-svg { color: #fff; }
 
-        /* Checkbox Styling */
         .check-input:checked + .custom-check {
             background-color: #000;
             border-color: #000;
@@ -55,27 +52,33 @@
         }
         .check-input:checked + .custom-check svg { display: block; }
 
-        /* Loading Spinner */
         @keyframes spin { to { transform: rotate(360deg); } }
         .btn-loading .spinner { display: block; }
         .btn-loading .btn-text { opacity: 0; }
 
-        /* Shake Animation for Errors */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             20% { transform: translateX(-4px); }
             60% { transform: translateX(4px); }
         }
         .animate-shake { animation: shake 0.4s ease-in-out; }
+
+        .google-btn {
+            transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+        }
+        .google-btn:hover {
+            background-color: #f8f8f8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        }
+        .dark .google-btn:hover {
+            background-color: #27272a;
+        }
+        .google-btn:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black p-6">
-
-    <div class="fixed bottom-4 right-4 z-50 hidden">
-        <button id="themeToggle" class="bg-white dark:bg-zinc-800 p-2 rounded-full shadow-lg border border-gray-200 dark:border-zinc-700">
-            <span id="themeIcon">🌙</span>
-        </button>
-    </div>
 
     <div class="w-full max-w-[480px] bg-white dark:bg-[#141414] rounded-3xl shadow-2xl p-8 md:p-12 relative overflow-hidden border border-gray-100 dark:border-zinc-800 animate-fade-up">
 
@@ -90,7 +93,26 @@
             <p class="text-gray-500 dark:text-zinc-400 text-sm">Your churn predictions are waiting.</p>
         </div>
 
+        <!-- ── GOOGLE SIGN-IN ── -->
+        <a href="/accounts/google/login/?process=login"
+           class="google-btn w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-800 dark:text-gray-200 py-3.5 rounded-xl font-semibold text-sm mb-6 cursor-pointer select-none">
+            <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.34 3.08 29.43 1 24 1 14.84 1 7.07 6.48 3.65 14.24l7.12 5.53C12.5 13.41 17.77 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.74H24v9h12.43c-.54 2.9-2.18 5.36-4.64 7.01l7.14 5.54C43.29 37.28 46.1 31.35 46.1 24.55z"/>
+                <path fill="#FBBC05" d="M10.77 28.23A14.5 14.5 0 0 1 9.5 24c0-1.48.25-2.91.7-4.25L3.08 14.2A22.96 22.96 0 0 0 1 24c0 3.71.88 7.22 2.44 10.33l7.33-6.1z"/>
+                <path fill="#34A853" d="M24 47c5.43 0 9.99-1.79 13.32-4.87l-7.14-5.54C28.34 38.3 26.3 39 24 39c-6.23 0-11.5-3.91-13.23-9.27l-7.33 6.1C7.07 43.52 14.84 47 24 47z"/>
+            </svg>
+            Continue with Google
+        </a>
 
+        <!-- ── DIVIDER ── -->
+        <div class="flex items-center gap-3 mb-6">
+            <div class="flex-1 h-px bg-gray-100 dark:bg-zinc-800"></div>
+            <span class="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">or sign in with email</span>
+            <div class="flex-1 h-px bg-gray-100 dark:bg-zinc-800"></div>
+        </div>
+
+        <!-- ── ERROR BANNER ── -->
         <div id="formError" class="hidden bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm font-semibold mb-6 flex items-center gap-3">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -148,7 +170,6 @@
                 <span class="btn-text">Sign In</span>
                 <div class="spinner hidden absolute w-5 h-5 border-2 border-gray-400 border-t-white dark:border-t-black rounded-full animate-spin"></div>
             </button>
-
         </form>
 
         <div class="text-center mt-8 text-sm text-gray-500 dark:text-zinc-400 animate-fade-up delay-200">
@@ -162,13 +183,11 @@
     </div>
 
     <script>
-        // ── Theme Logic (Match System/Dashboard) ──
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
 
-        // ── Password Visibility ──
         const pwInput = document.getElementById('password');
         const pwToggle = document.getElementById('pwToggle');
         const eyeIcon = document.getElementById('eyeIcon');
@@ -181,14 +200,12 @@
                 : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
         });
 
-        // ── Validation Helpers ──
         function toggleErr(id, show) {
             const el = document.getElementById(id);
-            if(show) el.classList.remove('hidden'); else el.classList.add('hidden');
-
+            if (show) el.classList.remove('hidden'); else el.classList.add('hidden');
             const inputEl = document.getElementById(id.replace('Err', ''));
-            if(inputEl) {
-                if(show) {
+            if (inputEl) {
+                if (show) {
                     inputEl.classList.add('border-red-500', 'focus:ring-red-500');
                     inputEl.classList.remove('border-gray-200', 'dark:border-zinc-700', 'focus:ring-black', 'dark:focus:ring-white');
                 } else {
@@ -202,7 +219,6 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
         }
 
-        // ── 🚀 LOGIN API CALL ──
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -229,37 +245,30 @@
             try {
                 const response = await fetch('/api/login/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-                    body: JSON.stringify({ email: email, password: password })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({ email, password })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    // ✅ SUCCESS — check if 2FA OTP is required
-                    if (data.requires_otp) {
-                        window.location.href = data.redirect;
-                    } else {
-                        window.location.href = '/dashboard/';
-                    }
+                    window.location.href = data.requires_otp ? data.redirect : '/dashboard/';
                 } else {
-                    // ❌ ERROR FROM DJANGO
                     document.getElementById('formErrorText').innerText = data.error || "Invalid email or password.";
                     errorBanner.classList.remove('hidden');
-                    // Force reflow to restart animation
                     void errorBanner.offsetWidth;
                     errorBanner.classList.add('animate-shake');
-
                     btn.classList.remove('btn-loading');
                     btn.disabled = false;
                 }
-
             } catch (error) {
                 document.getElementById('formErrorText').innerText = "Something went wrong. Please try again.";
                 errorBanner.classList.remove('hidden');
                 void errorBanner.offsetWidth;
                 errorBanner.classList.add('animate-shake');
-
                 btn.classList.remove('btn-loading');
                 btn.disabled = false;
             }
