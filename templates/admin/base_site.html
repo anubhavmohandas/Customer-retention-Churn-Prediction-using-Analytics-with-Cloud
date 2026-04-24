@@ -17,6 +17,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="{% static 'admin/css/custom_admin.css' %}">
+<style>
+  /* Style the logout link as a red Sign Out button */
+  #user-tools a[href*="logout"] {
+    background: #e53e3e;
+    color: #fff !important;
+    padding: 3px 12px;
+    border-radius: 5px;
+    font-weight: 600;
+    margin-left: 6px;
+    text-decoration: none !important;
+  }
+  #user-tools a[href*="logout"]:hover {
+    background: #c53030;
+  }
+</style>
 {% endblock %}
 
 {% block extrahead %}
@@ -33,32 +48,6 @@
   document.documentElement.setAttribute('data-theme', 'light');
   document.documentElement.classList.remove('dark');
 </script>
-{% endblock %}
-
-{% block usertools %}
-{% if has_permission %}
-<div id="user-tools">
-  {% block welcome-msg %}
-    {% trans 'Welcome,' %}
-    <strong>{% firstof user.get_short_name user.get_username %}</strong>.
-  {% endblock %}
-  {% block userlinks %}
-    {% if site_url %}
-      <a href="{{ site_url }}">{% trans 'View site' %}</a> /
-    {% endif %}
-    {% if user.is_active and user.is_staff %}
-      {% url 'django-admindocs-docroot' as docsroot %}
-      {% if docsroot %}
-        <a href="{{ docsroot }}">{% trans 'Documentation' %}</a> /
-      {% endif %}
-    {% endif %}
-    {% if user.has_usable_password %}
-      <a href="{% url 'admin:password_change' %}">{% trans 'Change password' %}</a> /
-    {% endif %}
-    <a href="{% url 'admin:logout' %}" style="background:#e53e3e;color:#fff;padding:3px 12px;border-radius:5px;font-weight:600;margin-left:6px;text-decoration:none;">Sign out</a>
-  {% endblock %}
-</div>
-{% endif %}
 {% endblock %}
 
 {% block footer %}
