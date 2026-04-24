@@ -51,8 +51,6 @@ html, body {
 }
 
 /* Hide the moon/sun dark-mode toggle — every possible selector */
-#header button,
-#user-tools button,
 #header a[data-color-scheme-toggle],
 #header button[data-color-scheme-toggle],
 [data-color-scheme-toggle],
@@ -67,6 +65,28 @@ a.theme-toggle,
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+}
+
+/* Sign Out button — keep visible */
+#logout-form {
+  display: inline !important;
+}
+#logout-form button {
+  display: inline !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  background: #e53e3e !important;
+  color: #fff !important;
+  padding: 3px 12px !important;
+  border-radius: 5px !important;
+  font-weight: 600 !important;
+  margin-left: 8px !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 0.8125rem !important;
+}
+#logout-form button:hover {
+  background: #c53030 !important;
 }
 
 /* ── FONTS ── */
