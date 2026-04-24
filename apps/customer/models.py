@@ -100,6 +100,7 @@ class ActivityLog(models.Model):
         ('ACCOUNT_DELETED',   'Account Deleted'),
         ('BULK_PREDICT',      'Bulk Prediction Run'),
         ('CSV_EXPORT',        'CSV Export / Download'),
+        ('MODEL_RETRAIN',     'Model Retrained'),
     ]
 
     # Nullable — failed logins have no authenticated user
