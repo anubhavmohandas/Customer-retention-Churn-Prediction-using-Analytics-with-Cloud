@@ -18,18 +18,24 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="{% static 'admin/css/custom_admin.css' %}">
 <style>
-  /* Style the logout link as a red Sign Out button */
-  #user-tools a[href*="logout"] {
+  /* Style the logout form button as a red Sign Out button (Django 5+ uses POST form) */
+  #logout-form button {
     background: #e53e3e;
     color: #fff !important;
     padding: 3px 12px;
     border-radius: 5px;
     font-weight: 600;
     margin-left: 6px;
-    text-decoration: none !important;
+    border: none;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
   }
-  #user-tools a[href*="logout"]:hover {
+  #logout-form button:hover {
     background: #c53030;
+  }
+  #logout-form {
+    display: inline;
   }
 </style>
 {% endblock %}
