@@ -10,6 +10,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Production-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![AWS EC2](https://img.shields.io/badge/AWS-EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)](https://aws.amazon.com/ec2)
 [![HTTPS](https://img.shields.io/badge/HTTPS-Secured-00C853?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://letsencrypt.org)
+[![Google OAuth](https://img.shields.io/badge/Google-OAuth-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/identity)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 <br/>
@@ -32,11 +33,14 @@ Most churn prediction projects are Jupyter notebooks. **This is a production app
 | Bulk CSV prediction — thousands of customers at once | ✅ Live |
 | Auto-train new models from your own dataset | ✅ Live |
 | 2FA login via email OTP | ✅ Live |
+| Google OAuth (Sign in with Google) | ✅ Live |
 | Forgot password with secure email link | ✅ Live |
 | Real-time risk scoring with animated UI | ✅ Live |
 | PostgreSQL + AWS EC2 + HTTPS deployment | ✅ Live |
 | SMOTE for handling class imbalance | ✅ Live |
 | Rate limiting, CSRF protection, joblib serialization | ✅ Live |
+| Full audit trail (login, logout, delete, exports) | ✅ Live |
+| Account self-deletion with data wipe | ✅ Live |
 
 ---
 
@@ -65,16 +69,22 @@ Most churn prediction projects are Jupyter notebooks. **This is a production app
 
 **Authentication**
 - **2FA via Email OTP** — every login triggers a 6-digit code sent to the user's inbox. Expires in 10 minutes.
+- **Google OAuth** — Sign in with Google via django-allauth. Auto-links to existing email/password accounts.
 - **Forgot Password** — UUID token-based reset link. Expires in 1 hour. Immune to email enumeration.
-- **OTP brute force protection** — verification endpoint locks after 5 wrong attempts per IP for 15 minutes
+- **OTP brute force protection** — dual-layer: 5 wrong attempts per IP per 15 min + 10 cumulative failures locks the account for 30 minutes (defeats IP-rotating attackers)
 - **Constant-time OTP comparison** — `constant_time_compare()` prevents timing attacks that could leak code correctness
+- **Session fixation prevention** — `cycle_key()` regenerates the session ID at the password→OTP transition, invalidating any previously known session
 - **Token invalidation** — old OTPs and reset tokens are immediately invalidated when a new one is requested. No stale valid tokens.
 - **Atomic OTP login** — OTP mark-used and session login wrapped in `transaction.atomic()` to prevent race conditions
 - **Resend rate limiting** — max 3 OTP resends per IP per 15 minutes to prevent inbox flooding
+- **Password reset rate limiting** — max 3 requests per IP per hour
 
 **API & Infrastructure**
-- **CSRF protection** on all endpoints via Django middleware
-- **Rate limiting** — 3 model training requests per hour per user
+- **CSRF protection** on all endpoints via Django middleware + `SessionAuthentication` on DRF views
+- **Input bounds validation** — tenure (0–120 months), monthly charges (0–10,000), contract type whitelist
+- **Sanitized error responses** — internal exceptions logged server-side only; API returns generic messages
+- **Rate limiting** — login (5/15min), OTP verify (5/15min), OTP resend (3/15min), password reset (3/hr), model training (3/hr)
+- **Full audit trail** — `ActivityLog` records every login failure, logout, account deletion, bulk prediction, and CSV export with IP and timestamp
 - **DB indexes** on all foreign keys for query performance
 - **joblib model serialization** — no arbitrary code execution on model load (unlike pickle)
 - **HSTS, SSL redirect, X-Frame-Options DENY, Content-Type nosniff** enforced in production
@@ -98,7 +108,7 @@ Most churn prediction projects are Jupyter notebooks. **This is a production app
 | **Backend** | Django 6.0, Django REST Framework |
 | **ML** | XGBoost, scikit-learn, imbalanced-learn (SMOTE) |
 | **Database** | PostgreSQL (prod), SQLite (dev) |
-| **Auth** | Custom User Model, 2FA OTP, Password Reset |
+| **Auth** | Custom User Model, 2FA OTP, Google OAuth (django-allauth), Password Reset |
 | **Email** | Resend API |
 | **Frontend** | Tailwind CSS, Vanilla JS |
 | **Server** | Gunicorn (gthread workers), Nginx |
@@ -144,6 +154,10 @@ DATABASE_URL=postgres://user:pass@localhost:5432/dbname
 # Resend — for 2FA OTP and password reset emails
 RESEND_API_KEY=re_your_key_here
 RESEND_FROM_EMAIL=Retain.Ai <noreply@yourdomain.com>
+
+# Google OAuth — get from Google Cloud Console
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 ---
@@ -188,19 +202,45 @@ Raw CSV (IBM Telco Dataset)
 
 ## 🔒 Authentication Flow
 
+**Email + Password (2FA):**
 ```
 User enters email + password
+        │
+        ▼
+  Rate limit check (5/15min per IP)
         │
         ▼
   Credentials verified
         │
         ▼
-  6-digit OTP generated
+  session.cycle_key()  ← session fixation fix
+        │
+        ▼
+  6-digit OTP generated (secrets.randbelow)
   → sent to email via Resend
   → stored in DB with 10-min expiry
         │
         ▼
   User enters OTP on /verify-otp/
+  (rate limited: 5/IP/15min + 10/account/30min)
+        │
+        ▼
+  Constant-time comparison
+        │
+        ▼
+  ✅ Logged in → Dashboard
+```
+
+**Google OAuth:**
+```
+User clicks "Continue with Google"
+        │
+        ▼
+  Google OAuth consent screen
+        │
+        ▼
+  allauth callback → auto-links to existing account
+  (if email matches) or creates new one
         │
         ▼
   ✅ Logged in → Dashboard
@@ -213,10 +253,12 @@ User enters email + password
 ```
 ├── apps/
 │   └── customer/
-│       ├── models.py          # Customer, PredictionReport, OTPCode, PasswordResetToken
+│       ├── models.py          # Customer, PredictionReport, OTPCode, PasswordResetToken, ActivityLog, LoginHistory
 │       ├── views.py           # All views + API endpoints
 │       ├── urls.py            # URL routing
 │       ├── admin.py           # Admin panel config
+│       ├── signals.py         # Login/logout/delete audit logging via Django signals
+│       ├── adapters.py        # Custom allauth adapter (Google OAuth login redirect)
 │       ├── resend_utils.py    # Email sending via Resend API
 │       └── templates/         # HTML templates (Tailwind CSS)
 ├── churn_prediction/
