@@ -107,9 +107,9 @@
 
   <script id="analysis-data" type="application/json">
     {
-      "contractLabels": {{ contract_labels_json }},
-      "contractValues": {{ contract_values_json }},
-      "correlationData": {{ correlation_data_json }}
+      "contractLabels": {{ contract_labels_json|safe }},
+      "contractValues": {{ contract_values_json|safe }},
+      "correlationData": {{ correlation_data_json|safe }}
     }
   </script>
 

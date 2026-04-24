@@ -117,7 +117,7 @@
   </div>
 
   <script id="model-comparison-data" type="application/json">
-    {{ comparison_json }}
+    {{ comparison_json|safe }}
   </script>
 
   <script src="{% static 'assets/js/main.js' %}"></script>
