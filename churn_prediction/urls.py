@@ -21,8 +21,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('accounts/', include('allauth.socialaccount.urls')),
-    path('', include('apps.customer.urls')),
+    path('', include('apps.customer.urls')),   # our routes first (keeps /accounts/login/ ours)
+    path('accounts/', include('allauth.urls')), # allauth handles /accounts/google/login/ etc.
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 
