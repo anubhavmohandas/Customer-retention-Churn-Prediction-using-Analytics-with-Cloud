@@ -187,6 +187,7 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_ADAPTER = 'apps.customer.adapters.CustomSocialAccountAdapter'
 
+
 # ---------------------------------------------------------------------------
 # Static files (WhiteNoise)
 # ---------------------------------------------------------------------------
