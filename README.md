@@ -41,6 +41,7 @@ Most churn prediction projects are Jupyter notebooks. **This is a production app
 | Rate limiting, CSRF protection, joblib serialization | ✅ Live |
 | Full audit trail (login, logout, delete, exports) | ✅ Live |
 | Account self-deletion with data wipe | ✅ Live |
+| Report History PDF export (clean A4 landscape) | ✅ Live |
 
 ---
 
