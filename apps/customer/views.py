@@ -912,6 +912,13 @@ def password_reset_request(request):
     if request.method == 'GET':
         return render(request, 'password_reset_request.html')
 
+    # Rate limit: 3 requests per IP per hour
+    ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+          or request.META.get('REMOTE_ADDR', ''))
+    rate_key = f"pwd_reset_{ip}"
+    if cache.get(rate_key, 0) >= 3:
+        return render(request, 'password_reset_sent.html', {'email': ''})  # Silently absorb — don't reveal limit
+
     email = request.POST.get('email', '').strip().lower()
     try:
         user = Customer.objects.get(email=email)
@@ -923,6 +930,7 @@ def password_reset_request(request):
     except Customer.DoesNotExist:
         pass  # Don't reveal whether email exists
 
+    cache.set(rate_key, cache.get(rate_key, 0) + 1, 3600)  # 3600s = 1 hour
     # Always show the same page to prevent email enumeration
     return render(request, 'password_reset_sent.html', {'email': email})
 
