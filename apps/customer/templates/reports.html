@@ -93,7 +93,7 @@
           <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight dark:text-white">Report History</h2>
           <p class="text-gray-500 dark:text-zinc-400 mt-1 font-medium">Monitoring frozen snapshots across {{ total_sims|default:"0" }} sessions (30-day retention).</p>
         </div>
-        <button class="bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:scale-95 transition-all no-print" onclick="window.print()">
+        <button class="bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:scale-95 transition-all no-print" onclick="printReport()">
           Export PDF
         </button>
       </header>
@@ -235,5 +235,68 @@
   </div>
 
   <script src="{% static 'assets/js/main.js' %}"></script>
+  <script>
+    function printReport() {
+      const tableHTML = document.querySelector('table').outerHTML;
+      const statCards = document.querySelector('.grid').outerHTML;
+      const title = "Retain.Ai — Report History";
+      const subtitle = document.querySelector('header p').textContent;
+
+      const win = window.open('', '_blank');
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @page { size: A4 landscape; margin: 12mm; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; background: white; color: #111; padding: 16px; }
+            h1 { font-size: 28px; font-weight: 900; margin-bottom: 4px; }
+            p  { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+            .grid { display: flex; gap: 10px; margin-bottom: 16px; }
+            .grid > div { flex: 1; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+            .text-\\[10px\\] { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; display: block; margin-bottom: 6px; }
+            .text-4xl { font-size: 26px; font-weight: 900; }
+            .text-white { color: white; }
+            .bg-black { background: black; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #f9fafb; padding: 8px 14px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; border-bottom: 1px solid #f3f4f6; }
+            td { padding: 10px 14px; border-bottom: 1px solid #f9fafb; vertical-align: middle; }
+            .font-bold { font-weight: 700; }
+            .text-sm { font-size: 12px; }
+            .text-2xl { font-size: 18px; font-weight: 900; }
+            .text-\\[11px\\] { font-size: 10px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+            .text-\\[9px\\] { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 20px; }
+            .bg-emerald-500\\/10 { background: #d1fae5; }
+            .text-emerald-500 { color: #10b981; }
+            .bg-red-500\\/10 { background: #fee2e2; }
+            .text-red-500 { color: #ef4444; }
+            .bg-gray-100 { background: #f3f4f6; }
+            .border { border: 1px solid #e5e7eb; }
+            .rounded-lg { border-radius: 6px; }
+            .px-3 { padding-left: 10px; padding-right: 10px; }
+            .py-1\\.5 { padding-top: 4px; padding-bottom: 4px; }
+            .text-gray-500 { color: #6b7280; }
+            .text-right { text-align: right; }
+            .c-critical { color: #dc2626; }
+            .c-warning  { color: #ca8a04; }
+            .c-stable   { color: #059669; }
+            .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; display: block; }
+            tr { page-break-inside: avoid; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p>${subtitle}</p>
+          ${statCards}
+          ${tableHTML}
+          <script>window.onload = function(){ window.print(); window.close(); }<\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
+    }
+  </script>
 </body>
 </html>
