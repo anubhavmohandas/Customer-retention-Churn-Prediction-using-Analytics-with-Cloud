@@ -15,8 +15,9 @@ from imblearn.over_sampling import SMOTE
 from xgboost import XGBClassifier
 from django.contrib import messages
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -660,6 +661,19 @@ def settings_page(request):
             messages.error(request, f"An error occurred: {e}")
 
     return render(request, 'settings.html')
+
+
+# ==========================================
+# DELETE ACCOUNT VIEW
+# ==========================================
+
+@login_required(login_url='/accounts/login/')
+@require_POST
+def delete_account(request):
+    user = request.user
+    logout(request)
+    user.delete()
+    return redirect('/accounts/login/')
 
 
 # ==========================================
