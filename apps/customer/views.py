@@ -503,6 +503,30 @@ def report_history_page(request):
 
 
 @login_required(login_url='/accounts/login/')
+def report_history_print(request):
+    """Clean print-only view — no sidebar, no topbar. Used by Export PDF button."""
+    reports = ReportHistory.objects.filter(user=request.user).order_by('-created_at')
+    stats = reports.aggregate(
+        total_rec=Sum('total_records'),
+        avg_risk=Avg('avg_risk_score'),
+        crit_count=Sum('critical_count')
+    )
+    annotated = []
+    for report in reports:
+        report.display_risk = (report.avg_risk_score or 0) * 100
+        annotated.append(report)
+    context = {
+        'reports': annotated,
+        'total_sims': reports.count(),
+        'total_records': stats['total_rec'] or 0,
+        'avg_risk': round((stats['avg_risk'] or 0) * 100, 1),
+        'critical_count': int(stats['crit_count'] or 0),
+        'now': timezone.now(),
+    }
+    return render(request, 'reports_print.html', context)
+
+
+@login_required(login_url='/accounts/login/')
 def risk_analysis_page(request):
     reports = PredictionReport.objects.filter(user=request.user)
 

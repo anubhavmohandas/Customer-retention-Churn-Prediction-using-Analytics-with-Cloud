@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Retain.Ai — Report History</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: white; color: #111; padding: 20px; }
+
+    .header { margin-bottom: 20px; }
+    .header h1 { font-size: 26px; font-weight: 900; margin-bottom: 2px; }
+    .header p  { font-size: 12px; color: #6b7280; }
+
+    .stats { display: flex; gap: 10px; margin-bottom: 20px; }
+    .stat-card { flex: 1; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; }
+    .stat-card.dark { background: black; color: white; }
+    .stat-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #9ca3af; margin-bottom: 6px; }
+    .stat-card.dark .stat-label { color: #6b7280; }
+    .stat-value { font-size: 26px; font-weight: 900; }
+    .stat-value.red { color: #ef4444; }
+    .stat-value.gray { color: #6b7280; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead { background: #f9fafb; }
+    th { padding: 8px 14px; text-align: left; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #9ca3af; border-bottom: 1px solid #e5e7eb; }
+    th.right { text-align: right; }
+    td { padding: 12px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    td.right { text-align: right; }
+    tr { page-break-inside: avoid; }
+
+    .batch-name  { font-weight: 700; font-size: 13px; }
+    .batch-meta  { font-size: 10px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+    .expiry-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 20px; background: #d1fae5; color: #059669; }
+    .expiry-badge.urgent { background: #fee2e2; color: #ef4444; }
+
+    .rows-label { font-weight: 700; font-size: 13px; }
+    .source-file { font-size: 10px; color: #9ca3af; font-weight: 700; margin-top: 2px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .model-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; background: #f3f4f6; border: 1px solid #e5e7eb; color: #6b7280; display: inline-block; }
+
+    .risk-score { font-size: 20px; font-weight: 900; }
+    .risk-score.critical { color: #dc2626; }
+    .risk-score.warning  { color: #ca8a04; }
+    .risk-score.stable   { color: #059669; }
+
+    .footer { margin-top: 16px; font-size: 10px; color: #9ca3af; text-align: right; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Retain.Ai — Report History</h1>
+    <p>Monitoring frozen snapshots across {{ total_sims }} sessions (30-day retention) &nbsp;·&nbsp; Exported {{ now|date:"d M Y, H:i" }}</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Total Sessions</div>
+      <div class="stat-value">{{ total_sims }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Records Scanned</div>
+      <div class="stat-value">{{ total_records }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Critical Alerts</div>
+      <div class="stat-value red">{{ critical_count }}</div>
+    </div>
+    <div class="stat-card dark">
+      <div class="stat-label">Avg Batch Risk</div>
+      <div class="stat-value">{{ avg_risk }}%</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Snapshot / Expiry</th>
+        <th>Execution Details</th>
+        <th>Model Engine</th>
+        <th class="right">Batch Risk Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for report in reports %}
+      <tr>
+        <td>
+          <div class="batch-name">{{ report.batch_name }}</div>
+          <div class="batch-meta">
+            {{ report.created_at|date:"d M Y" }}
+            <span class="expiry-badge {% if report.days_remaining < 5 %}urgent{% endif %}">
+              Expires in {{ report.days_remaining }}d
+            </span>
+          </div>
+        </td>
+        <td>
+          <div class="rows-label">{{ report.total_records }} Rows Processed</div>
+          <div class="source-file">{{ report.source_file }}</div>
+        </td>
+        <td>
+          <span class="model-badge">{{ report.model_version }}</span>
+        </td>
+        <td class="right">
+          <span class="risk-score {% if report.display_risk >= 70 %}critical{% elif report.display_risk >= 30 %}warning{% else %}stable{% endif %}">
+            {{ report.display_risk|floatformat:1 }}%
+          </span>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="text-align:center; padding: 40px; color: #9ca3af; font-weight: 700; text-transform: uppercase; font-size: 11px;">
+          No archived snapshots available
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="footer">churnprediction.duckdns.org/reports</div>
+
+  <script>window.onload = function(){ window.print(); }</script>
+</body>
+</html>

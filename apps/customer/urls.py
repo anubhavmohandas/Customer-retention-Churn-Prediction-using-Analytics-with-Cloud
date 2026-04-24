@@ -9,7 +9,7 @@ from apps.customer.views import (
     SinglePredictionView,
     BulkPredictionView,
     prediction_page,
-    report_history_page,
+    report_history_page, report_history_print,
     risk_analysis_page, export_risk_list, ai_models_page, settings_page, delete_account,
     TrainCustomModelView,
     otp_verify_page, resend_otp,
@@ -29,6 +29,7 @@ urlpatterns = [
     path('dashboard/', dashboard_page, name='dashboard_page'),  # Alternative path
     path('prediction/', prediction_page, name='prediction_page'),
     path('reports/', report_history_page, name='report_history'),
+    path('reports/print/', report_history_print, name='report_history_print'),
     path('risk-analysis/',risk_analysis_page, name='risk_analysis'),
     path('export-risk-list/', export_risk_list, name='export_risk_list'),
     path('ai-models/', ai_models_page, name='ai_models_page'),
